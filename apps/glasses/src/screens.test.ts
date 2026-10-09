@@ -1,33 +1,85 @@
 import { describe, expect, it, vi } from 'vitest';
-import { OsEventTypeList, StartUpPageCreateResult, List_ItemEvent, Text_ItemEvent, Sys_ItemEvent, type EvenAppBridge } from '@evenrealities/even_hub_sdk';
+import { List_ItemEvent, OsEventTypeList, StartUpPageCreateResult, Sys_ItemEvent, type EvenAppBridge } from '@evenrealities/even_hub_sdk';
+import type { ThreadDetail } from '@t3-glasses/protocol';
 import type { BridgeApi } from './api';
 import { GlassesApp } from './app';
 import { initialState, transition } from './screens';
-const detail = { envId: 'studio', envLabel: 'M4', id: 'one', title: 'Task', projectTitle: 'T3', status: 'running', attention: 'running' as const, updatedAt: '', messages: [], canInterrupt: true };
-describe('screen transitions', () => {
-  it('navigates back through actions and pauses in background', () => { let s = initialState(); s = transition(s, { type: 'OPEN_THREADS' }); s = transition(s, { type: 'OPEN_THREAD', detail }); s = transition(s, { type: 'OPEN_ACTIONS' }); expect(transition(s, { type: 'BACK' }).screen).toBe('Thread'); expect(transition(s, { type: 'FOREGROUND_EXIT' }).foreground).toBe(false); });
-  it('handles SDK click events with mocked bridge and API', async () => {
-    let callback: ((event: unknown) => void) | undefined;
-    const bridge = { onEvenHubEvent: vi.fn(cb => { callback = cb; return () => {}; }), createStartUpPageContainer: vi.fn(async () => StartUpPageCreateResult.success), rebuildPageContainer: vi.fn(async () => true), textContainerUpgrade: vi.fn(async () => true), audioControl: vi.fn(async () => true) } as unknown as EvenAppBridge;
-    const api = { health: vi.fn(async () => ({ ok: true, version: 'mock', protocol: 1, transcription: true })), envs: vi.fn(async () => []), threads: vi.fn(async () => [detail]), thread: vi.fn(async () => detail) } as unknown as BridgeApi;
-    const app = new GlassesApp(bridge, api); await app.start();
-    await app.handle({ listEvent: new List_ItemEvent({ eventType: OsEventTypeList.CLICK_EVENT, currentSelectItemIndex: 0 }) }); expect(app.state.screen).toBe('Threads');
-    await app.handle({ listEvent: new List_ItemEvent({ eventType: OsEventTypeList.CLICK_EVENT, currentSelectItemIndex: 0 }) }); expect(app.state.screen).toBe('Thread');
-    await app.handle({ textEvent: new Text_ItemEvent({}) }); expect(app.state.screen).toBe('Actions');
-    await app.handle({ sysEvent: new Sys_ItemEvent({ eventType: OsEventTypeList.FOREGROUND_EXIT_EVENT }) }); expect(app.state.foreground).toBe(false);
-    expect(callback).toBeDefined(); await app.stop();
+
+const detail: ThreadDetail = {
+  envId: 'm4',
+  envLabel: 'M4',
+  id: 'one',
+  title: 'Task',
+  projectTitle: 'T3',
+  status: 'running',
+  attention: 'approval',
+  updatedAt: '',
+  messages: [{ role: 'assistant', text: 'May I run the tests?', at: '' }],
+  canInterrupt: true,
+  pending: { kind: 'approval', requestId: 'req', requestKind: 'command', prompt: 'npm test', options: [{ decision: 'accept', label: 'Approve' }, { decision: 'decline', label: 'Deny' }] },
+};
+
+function harness() {
+  const bridge = {
+    onEvenHubEvent: vi.fn(() => () => {}),
+    createStartUpPageContainer: vi.fn(async () => StartUpPageCreateResult.success),
+    rebuildPageContainer: vi.fn(async () => true),
+    textContainerUpgrade: vi.fn(async () => true),
+    audioControl: vi.fn(async () => true),
+  } as unknown as EvenAppBridge;
+  const api = {
+    health: vi.fn(async () => ({ ok: true, version: 'test', protocol: 1, transcription: true })),
+    envs: vi.fn(async () => []),
+    threads: vi.fn(async () => [detail]),
+    thread: vi.fn(async () => detail),
+    approval: vi.fn(async () => ({ ok: true })),
+  } as unknown as BridgeApi;
+  return { bridge, api, app: new GlassesApp(bridge, api) };
+}
+
+const click = (index = 0) => ({ listEvent: new List_ItemEvent({ currentSelectItemIndex: index }) });
+
+describe('state machine', () => {
+  it('closes a card before leaving a thread', () => {
+    let s = transition(initialState(), { type: 'OPEN_THREADS' });
+    s = transition(s, { type: 'OPEN_THREAD', detail });
+    s = transition(s, { type: 'SHOW_CARD', card: { kind: 'notice', text: 'hi' } });
+    s = transition(s, { type: 'BACK' });
+    expect(s.screen).toBe('Thread');
+    expect(s.card).toBeUndefined();
+    expect(transition(s, { type: 'BACK' }).screen).toBe('Threads');
+  });
+  it('never pages before the newest page', () => {
+    expect(transition(initialState(), { type: 'PAGE', delta: -1 }).page).toBe(0);
   });
 });
-describe('click normalization', () => {
-  it('treats a system event without eventType as a click', async () => {
-    const bridge = { onEvenHubEvent: vi.fn(() => () => {}), createStartUpPageContainer: vi.fn(async () => StartUpPageCreateResult.success), rebuildPageContainer: vi.fn(async () => true), textContainerUpgrade: vi.fn(async () => true), audioControl: vi.fn(async () => true) } as unknown as EvenAppBridge;
-    const api = { health: vi.fn(async () => ({ ok: true, version: 'mock', protocol: 1, transcription: true })), envs: vi.fn(async () => []), threads: vi.fn(async () => [detail]), thread: vi.fn(async () => detail) } as unknown as BridgeApi;
-    const app = new GlassesApp(bridge, api); await app.start();
-    await app.handle({ listEvent: new List_ItemEvent({ currentSelectItemIndex: 0 }) });
-    await app.handle({ listEvent: new List_ItemEvent({ currentSelectItemIndex: 0 }) });
+
+describe('glasses app', () => {
+  it('opens a thread and approves from the card', async () => {
+    const { app, api } = harness();
+    await app.start();
+    await app.handle(click(0)); // Inbox
+    expect(app.state.screen).toBe('Threads');
+    await app.handle(click(0)); // first thread
     expect(app.state.screen).toBe('Thread');
+    // A tap on the body arrives as a system event without an eventType.
     await app.handle({ sysEvent: new Sys_ItemEvent({ eventSource: 1 }) });
-    expect(app.state.screen).toBe('Actions');
+    expect(app.state.card?.kind).toBe('actions');
+    await app.handle(click(0)); // Approve
+    expect(api.approval).toHaveBeenCalledWith('m4', 'one', { requestId: 'req', decision: 'accept' });
+    expect(app.state.card).toEqual({ kind: 'notice', text: '• Approved' });
+    await app.stop();
+  });
+
+  it('pages history on scroll past the ends and goes back on double click', async () => {
+    const { app } = harness();
+    await app.start();
+    await app.handle(click(0));
+    await app.handle(click(0));
+    await app.handle({ sysEvent: new Sys_ItemEvent({ eventType: OsEventTypeList.SCROLL_TOP_EVENT }) });
+    expect(app.state.page).toBe(1);
+    await app.handle({ sysEvent: new Sys_ItemEvent({ eventType: OsEventTypeList.DOUBLE_CLICK_EVENT }) });
+    expect(app.state.screen).toBe('Threads');
     await app.stop();
   });
 });
