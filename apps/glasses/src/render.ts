@@ -331,9 +331,10 @@ function listStatus(threads: ThreadSummary[], fallback: string): string {
   return fallback;
 }
 
+/** Open threads only; settled history would swamp the count. */
 function countMeta(list: ThreadListResponse): string {
-  const total = list.threads.length + list.shelves.reduce((sum, shelf) => sum + shelf.count, 0);
-  return `${total} thread${total === 1 ? '' : 's'}`;
+  const open = list.threads.length + list.shelves.filter((shelf) => shelf.section !== 'settled').reduce((sum, shelf) => sum + shelf.count, 0);
+  return `${open} open`;
 }
 
 /** Home: every computer's threads in T3 Code's order. */
