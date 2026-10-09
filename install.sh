@@ -56,7 +56,7 @@ ln -sf "$CLI" "$BIN/t3-glasses"
 info "Installed the t3-glasses command in $BIN"
 
 # Setup is interactive; read answers from the terminal even when piped from curl.
-if [[ -r /dev/tty ]]; then
+if { true </dev/tty; } 2>/dev/null; then
   node "$CLI" setup </dev/tty
 else
   bold "Done. Run: t3-glasses setup"
