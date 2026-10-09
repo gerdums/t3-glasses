@@ -1,0 +1,26 @@
+{
+  "name": "@t3-glasses/bridge",
+  "version": "0.1.0",
+  "private": true,
+  "description": "Bridge between T3 Code environments and the t3-glasses Even Hub app",
+  "type": "module",
+  "bin": {
+    "t3-glasses": "./dist/cli.js"
+  },
+  "scripts": {
+    "build": "tsc -p tsconfig.json",
+    "typecheck": "tsc -p tsconfig.json --noEmit",
+    "test": "vitest run",
+    "start": "node dist/cli.js serve"
+  },
+  "dependencies": {
+    "@t3-glasses/protocol": "0.1.0"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "@types/ws": "^8.18.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0",
+    "ws": "^8.18.0"
+  }
+}
