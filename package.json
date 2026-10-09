@@ -1,0 +1,21 @@
+{
+  "name": "t3-glasses",
+  "private": true,
+  "version": "0.1.0",
+  "description": "View and drive your T3 Code threads from Even Realities G2 smart glasses",
+  "type": "module",
+  "packageManager": "npm@11.6.2",
+  "engines": {
+    "node": ">=22"
+  },
+  "workspaces": [
+    "packages/protocol",
+    "packages/bridge",
+    "apps/glasses"
+  ],
+  "scripts": {
+    "build": "npm run build --workspaces --if-present",
+    "typecheck": "npm run typecheck --workspaces --if-present",
+    "test": "npm run test --workspaces --if-present"
+  }
+}
