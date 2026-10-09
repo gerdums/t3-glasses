@@ -30,6 +30,8 @@ export const MAX_TEXT_BYTES = 990;
 export const LINE_HEIGHT = 27;
 /** List item labels are limited to 63 UTF-8 bytes. */
 export const MAX_ITEM_BYTES = 63;
+/** Height of one firmware list row, including its selection border. */
+const LIST_ROW_HEIGHT = 40;
 
 // ---- Layout (576 x 288) ------------------------------------------------------
 
@@ -176,7 +178,8 @@ function list(id: number, box: { x: number; y: number; w: number; h: number }, r
     xPosition: box.x,
     yPosition: box.y,
     width: box.w,
-    height: box.h,
+    // The firmware centers a list shorter than its box; fit short lists to their rows.
+    height: Math.min(box.h, items.length * LIST_ROW_HEIGHT + 4),
     isEventCapture: 1,
     zOrderIndex: id,
     itemContainer: new ListItemContainerProperty({ itemCount: items.length, isItemSelectBorderEn: 1, itemName: items }),

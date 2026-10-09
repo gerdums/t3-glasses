@@ -1,111 +1,152 @@
-# t3-glasses
+# T3 Glasses
 
-Your [T3 Code](https://t3.codes) threads on Even Realities G2 glasses. Sign in
-once, and the glasses show the same threads your phone does, from every
-computer on your T3 account: read the latest messages, approve or deny tool
-requests, answer questions, interrupt runs, and reply by voice with the R1 ring
-or temple touch.
+Your [T3 Code](https://t3.codes) threads on Even Realities G2 glasses.
 
-> Unofficial. Not affiliated with T3 Code or Even Realities. Account sign-in
-> uses T3's public web client id with the T3 Connect relay, which T3 does not
-> document for third-party apps; a T3 update could break it.
+Sign in once and the glasses show the same threads your phone does, from every
+computer on your T3 account. Read the latest messages, approve or deny tool
+requests, answer questions, interrupt runs, and reply by voice, all with the R1
+ring or a tap on the temple.
 
-```
-G2 + R1  ──BLE──  Even app (phone)  ──HTTPS/tailnet──  t3-glasses bridge  ──T3 Connect──  your T3 environments
-```
+<p align="center">
+  <img src="docs/screenshots/home.png" width="49%" alt="Home: every thread across your computers, with what needs you on top" />
+  <img src="docs/screenshots/approval.png" width="49%" alt="Approving a command from the glasses" />
+</p>
 
-## What you need
+> Unofficial. Not affiliated with T3 Code or Even Realities.
 
-- Even Realities G2 glasses (R1 ring optional), Even app 2.2.10 or later
-- A computer that stays on (macOS for the login service), Node.js 22+
-- [Tailscale](https://tailscale.com) on that computer and your phone
-- A T3 Code account with your computers linked through T3 Connect
+## Set up in two steps
 
-## Set up
+You need a Mac that stays on, [Tailscale](https://tailscale.com/download) on
+that Mac and on your phone (signed in to the same account), and a T3 Code
+account with your computers linked through T3 Connect.
 
-```sh
-git clone https://github.com/gerdums/t3-glasses && cd t3-glasses
-npm install && npm run build
-npm link -w @t3-glasses/bridge        # puts `t3-glasses` on your PATH
-
-t3-glasses setup                      # email code sign-in; lists your computers
-t3-glasses expose                     # HTTPS on your tailnet; prints the bridge URL
-t3-glasses service install            # run the bridge at login and keep it running
-```
-
-Voice replies need speech-to-text. Local and private (macOS):
+**1. On your Mac, run:**
 
 ```sh
-brew install whisper-cpp
-mkdir -p ~/.local/share/t3-glasses/models
-curl -L -o ~/.local/share/t3-glasses/models/ggml-base.en.bin \
-  https://huggingface.co/ggerganov/whisper.cpp/resolve/main/ggml-base.en.bin
-t3-glasses transcription command -- whisper-cli -m ~/.local/share/t3-glasses/models/ggml-base.en.bin -nt -np -l en -f '{wav}'
-t3-glasses service restart
+curl -fsSL https://raw.githubusercontent.com/gerdums/t3-glasses/main/install.sh | bash
 ```
 
-Or use OpenAI: `t3-glasses transcription openai` with `OPENAI_API_KEY` set
-before `t3-glasses service install`.
+The installer gets anything missing (Node.js, Tailscale) with Homebrew, then
+walks you through the rest:
 
-## Install the glasses app
-
-The Even app only lets a package reach origins listed in its manifest, so build
-one for your bridge:
-
-```sh
-BRIDGE_URL=https://your-mac.your-tailnet.ts.net:4417 npm run pack -w @t3-glasses/glasses
+```
+1/5  Sign in to T3                     ✓ Signed in       (email code; GitHub accounts work too)
+2/5  Find your computers               ✓ Mac Studio
+                                       ✓ MacBook Pro
+3/5  Publish the bridge on your tailnet ✓ https://mac-studio.your-tailnet.ts.net:4417
+4/5  Voice replies                     ✓ Running locally; audio never leaves this computer
+5/5  Start the bridge                  ✓ Runs at login and restarts if it stops
 ```
 
-Upload `apps/glasses/t3-glasses.ehpk` under **Private builds** in the
-[Even Hub developer portal](https://hub.evenrealities.com), then install it
-from the Even app. For development, see [apps/glasses/README.md](apps/glasses/README.md).
+and ends with a QR code.
 
-Then pair it: run `t3-glasses glasses-code`, open T3 Glasses in the Even app,
-and enter the 6-digit code.
+**2. On your phone:** in the Even app, turn on **Developer Mode** (Hardware
+tab), open the **Even Hub** tab, tap **Scan QR**, and scan the code. The app
+opens on your glasses already paired. That's it.
+
+<p align="center"><img src="docs/screenshots/phone.png" width="360" alt="The phone page in the Even app" /></p>
+
+Lost the QR code, or it expired after 10 minutes? Run `t3-glasses glasses-code`.
+
+## What runs on your Mac
+
+Setup installs two macOS login agents. They start when you log in and restart
+if they stop, so there's nothing to keep open:
+
+| Agent | What it does |
+|---|---|
+| `io.github.gerdums.t3-glasses` | The bridge: keeps a live connection to each of your T3 computers and serves the glasses app on your tailnet |
+| `io.github.gerdums.t3-glasses.whisper` | [whisper.cpp](https://github.com/ggml-org/whisper.cpp) speech-to-text for voice replies, kept warm so transcription takes well under a second |
+
+Check on them with `t3-glasses status`. Logs are in `~/Library/Logs/t3-glasses*.log`.
+Computers you link to T3 Connect later show up on the glasses automatically.
 
 ## Using it
 
-| Gesture | Does |
+| | |
 |---|---|
-| Scroll | Move through a list, or page through a conversation's history |
-| Tap | Open the selected thread or computer; in a thread, open actions |
-| Double-tap | Back (closes a card first) |
-| Press and hold | In a thread, record a voice reply; release to stop |
+| ![A conversation, newest message visible first](docs/screenshots/thread.png) | ![A question with its choices](docs/screenshots/question.png) |
+| ![A running thread with its live command](docs/screenshots/running.png) | ![Sending a dictated reply](docs/screenshots/voice.png) |
 
-Home lists your threads across every computer, with anything waiting for you
-on top. The last row opens **Computers**, one list per machine.
+| Gesture | Lists | In a thread |
+|---|---|---|
+| Scroll | Move through the list | Page back through older messages |
+| Tap | Open | Show actions: approve, answer, reply, interrupt |
+| Double-tap | Back | Back (closes a card first) |
+| Press and hold | | Record a voice reply; release to stop |
 
-Markers: `◆` needs you (approval or question) · `»` running · `×` failed ·
-`•` finished · `·` idle.
+Home lists your threads across all computers, with anything waiting for you on
+top. The last row opens **Computers**, one list per machine.
+
+<p align="center"><img src="docs/screenshots/computers.png" width="49%" alt="Computers" /></p>
+
+Markers: `◆` needs you · `»` running · `×` failed · `•` finished · `·` idle.
 
 ## Commands
 
 ```
-t3-glasses setup | status | expose | glasses-code
-t3-glasses service install | uninstall | restart | status
-t3-glasses transcription openai | command -- <cmd> | none
-t3-glasses pair <link> | unpair <id>   # machines not on T3 Connect
-t3-glasses token --rotate | logout
+t3-glasses setup            Run the guided setup again (safe; finished steps are skipped)
+t3-glasses status           Account, computers, services, and the bridge address
+t3-glasses glasses-code     New pairing QR code
+t3-glasses service restart|status|uninstall
+t3-glasses uninstall        Remove the services, tailnet address, sign-in, and settings
 ```
 
-Config and secrets live in `~/.config/t3-glasses/config.json` (mode 0600).
-Logs: `~/Library/Logs/t3-glasses.log`.
+Update by running the install command again. More: `t3-glasses help`.
+
+<details>
+<summary><b>Other ways to install the glasses app</b></summary>
+
+Scanning the QR code uses the Even app's developer mode, which loads the app
+from your bridge. To install it like a regular Even Hub app instead, build a
+private package for your bridge and upload it under **Private builds** in the
+[Even Hub developer portal](https://hub.evenrealities.com):
+
+```sh
+cd ~/.t3-glasses
+BRIDGE_URL=https://mac-studio.your-tailnet.ts.net:4417 npm run pack -w @t3-glasses/glasses
+```
+
+Install `apps/glasses/t3-glasses.ehpk` from the Even app, open it, and enter
+the 6-digit code from `t3-glasses glasses-code`.
+
+</details>
+
+<details>
+<summary><b>Voice options and computers not on T3 Connect</b></summary>
+
+- Skip local voice with `t3-glasses setup --no-voice`, or use OpenAI instead:
+  `t3-glasses transcription openai` with `OPENAI_API_KEY` set, then
+  `t3-glasses service install`.
+- A computer that isn't linked to T3 Connect can be paired directly:
+  create a pairing link in T3 Code's **Settings → Connections**, then
+  `t3-glasses pair '<link>'` and `t3-glasses service restart`.
+- Linux: clone the repo, `npm ci && npm run build`, then
+  `node packages/bridge/dist/cli.js setup` and run `t3-glasses serve` under
+  your own supervisor.
+
+</details>
 
 ## Security
 
-- The bridge holds a T3 account session and read/operate access to every
-  linked environment. Anyone with the glasses token can message your threads
-  and answer approvals, so keep the bridge on your tailnet only.
-- Environment sessions are limited to `orchestration:read orchestration:operate`:
-  no terminal, filesystem, or settings access.
-- Pairing codes are single-use, expire in 10 minutes, and lock after 5 wrong tries.
+- The bridge holds your T3 sign-in and can read and act on threads on every
+  linked computer. It asks each computer only for thread access
+  (`orchestration:read orchestration:operate`): no terminal, files, or settings.
+- It's reachable only on your tailnet, over HTTPS. The glasses get their own
+  token through a single-use pairing code (10 minutes, 5 tries).
+- Voice is transcribed on your Mac by default.
+- Secrets live in `~/.config/t3-glasses/config.json` with owner-only permissions.
+- Signing in uses T3's public web client id with the T3 Connect relay, which T3
+  doesn't document for third-party apps. A T3 update could break it.
 
 ## Development
 
 ```sh
-npm test            # bridge and glasses unit tests
-npm run typecheck
+npm install && npm run build
+npm test                  # bridge and glasses unit tests
 ```
 
-See [docs/architecture.md](docs/architecture.md) for the T3 protocol notes and
-[docs/glasses-ux.md](docs/glasses-ux.md) for the display design.
+- [docs/architecture.md](docs/architecture.md): how the bridge talks to T3
+- [docs/glasses-ux.md](docs/glasses-ux.md): the display design
+- [apps/glasses/README.md](apps/glasses/README.md): simulator workflow;
+  `apps/glasses/dev/shots.html` renders these screenshots from sample data
