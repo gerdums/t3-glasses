@@ -60,6 +60,11 @@ export interface GlassesPairing {
 export interface BridgeConfig {
   version: 1;
   glassesPairing?: GlassesPairing;
+  /**
+   * T3 Code's "Working section (beta)". "auto" follows the T3 desktop app's
+   * setting on this computer; T3 keeps it per device, never on the server.
+   */
+  workingSection?: "auto" | "on" | "off";
   /** Public HTTPS address of this bridge (set by `t3-glasses expose`). */
   bridgeUrl?: string;
   account?: AccountConfig;
@@ -166,4 +171,20 @@ export function redeemGlassesCode(config: BridgeConfig, code: string, now = Date
   }
   config.glassesPairing = undefined;
   return "ok";
+}
+
+/** Where the T3 desktop app keeps its per-device client settings. */
+export function t3DesktopClientSettingsPath(): string {
+  const home = process.env.T3CODE_HOME || join(homedir(), ".t3");
+  return join(home, "userdata", "client-settings.json");
+}
+
+/** Reads T3 desktop's "Working section (beta)" toggle; false when absent or unreadable. */
+export async function readT3WorkingSection(path = t3DesktopClientSettingsPath()): Promise<boolean> {
+  try {
+    const settings = JSON.parse(await readFile(path, "utf8")) as { sidebarWorkingShelfEnabled?: unknown };
+    return settings.sidebarWorkingShelfEnabled === true;
+  } catch {
+    return false;
+  }
 }

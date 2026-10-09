@@ -7,7 +7,7 @@
  * Budget: a page holds at most 8 text/list containers. The card and its list
  * replace the title meta and header divider while open.
  */
-import type { Attention, EnvSummary, ThreadDetail, ThreadSummary } from '@t3-glasses/protocol';
+import type { Attention, EnvSummary, ThreadDetail, ThreadListResponse, ThreadSection, ThreadSummary } from '@t3-glasses/protocol';
 import {
   ListContainerProperty,
   ListItemContainerProperty,
@@ -290,24 +290,58 @@ function onlineMeta(envs: EnvSummary[]): string {
   return `${envs.filter((env) => env.connected).length}/${envs.length} online`;
 }
 
-/** Home: every computer's threads, newest first with anything needing you on top. */
-export function homePage(threads: ThreadSummary[], envs: EnvSummary[], connection: string): Page {
-  const needs = threads.filter((t) => t.attention === 'approval' || t.attention === 'question').length;
-  const running = threads.filter((t) => t.attention === 'running').length;
-  const status = needs
-    ? `${MARK.approval} ${needs} need${needs === 1 ? 's' : ''} you`
-    : running
-      ? `${MARK.running} ${running} running`
-      : connection;
-  const rows = [...threads.slice(0, 19).map((t) => threadRow(t, true)), `\u203a Computers \u00b7 ${onlineMeta(envs)}`];
-  return page(chrome({ title: 'T3 Code', meta: `${threads.length} thread${threads.length === 1 ? '' : 's'}`, status, hint: '[Tap open]' }, true), [
-    list(ID.list, LIST_BOX, rows),
-  ]);
+export const SECTION_TITLES: Record<ThreadSection, string> = {
+  pinned: 'Pinned',
+  active: 'Active',
+  working: 'Working',
+  snoozed: 'Snoozed',
+  settled: 'Settled',
+};
+
+/** One selectable row of a thread list: a thread, a collapsed section, or Computers. */
+export type ListRow =
+  | { kind: 'thread'; thread: ThreadSummary }
+  | { kind: 'shelf'; section: ThreadSection; count: number }
+  | { kind: 'computers' };
+
+/**
+ * T3 Code's list: Pinned and Active threads, then the collapsed Working,
+ * Snoozed, and Settled shelves. Home ends with Computers.
+ */
+export function listRows(list: ThreadListResponse, withComputers: boolean): ListRow[] {
+  const room = 20 - list.shelves.length - (withComputers ? 1 : 0);
+  return [
+    ...list.threads.slice(0, room).map((thread) => ({ kind: 'thread' as const, thread })),
+    ...list.shelves.map((shelf) => ({ kind: 'shelf' as const, ...shelf })),
+    ...(withComputers ? [{ kind: 'computers' as const }] : []),
+  ];
 }
 
-/** Number of thread rows on Home before the Computers row. */
-export function homeThreadCount(threads: ThreadSummary[]): number {
-  return Math.min(threads.length, 19);
+function rowLabel(row: ListRow, envs: EnvSummary[], showEnv: boolean): string {
+  if (row.kind === 'thread') return threadRow(row.thread, showEnv);
+  if (row.kind === 'shelf') return `\u203a ${SECTION_TITLES[row.section]} \u00b7 ${row.count}`;
+  return `\u203a Computers \u00b7 ${onlineMeta(envs)}`;
+}
+
+function listStatus(threads: ThreadSummary[], fallback: string): string {
+  const needs = threads.filter((t) => t.attention === 'approval' || t.attention === 'question').length;
+  const running = threads.filter((t) => t.attention === 'running').length;
+  if (needs) return `${MARK.approval} ${needs} need${needs === 1 ? 's' : ''} you`;
+  if (running) return `${MARK.running} ${running} running`;
+  return fallback;
+}
+
+function countMeta(list: ThreadListResponse): string {
+  const total = list.threads.length + list.shelves.reduce((sum, shelf) => sum + shelf.count, 0);
+  return `${total} thread${total === 1 ? '' : 's'}`;
+}
+
+/** Home: every computer's threads in T3 Code's order. */
+export function homePage(listing: ThreadListResponse, envs: EnvSummary[], connection: string): Page {
+  const rows = listRows(listing, true).map((row) => rowLabel(row, envs, true));
+  return page(chrome({ title: 'T3 Code', meta: countMeta(listing), status: listStatus(listing.threads, connection), hint: '[Tap open]' }, true), [
+    list(ID.list, LIST_BOX, rows),
+  ]);
 }
 
 export function computersPage(envs: EnvSummary[], connection: string): Page {
@@ -316,17 +350,23 @@ export function computersPage(envs: EnvSummary[], connection: string): Page {
   ]);
 }
 
-export function threadsPage(threads: ThreadSummary[], title: string, showEnv: boolean): Page {
-  const needs = threads.filter((t) => t.attention === 'approval' || t.attention === 'question').length;
-  const running = threads.filter((t) => t.attention === 'running').length;
-  const status = needs
-    ? `${MARK.approval} ${needs} need${needs === 1 ? 's' : ''} you`
-    : running
-      ? `${MARK.running} ${running} running`
-      : `${MARK.done} All clear`;
+/** One computer's threads, with the same shelves as Home. */
+export function computerThreadsPage(listing: ThreadListResponse, title: string): Page {
+  const rows = listRows(listing, false).map((row) => rowLabel(row, [], false));
   return page(
-    chrome({ title, meta: `${threads.length} thread${threads.length === 1 ? '' : 's'}`, status, hint: '[Tap open · Dbl back]' }, true),
-    [list(ID.list, LIST_BOX, threads.length ? threads.map((t) => threadRow(t, showEnv)) : ['Nothing needs you right now'])],
+    chrome({ title, meta: countMeta(listing), status: listStatus(listing.threads, `${MARK.done} All clear`), hint: '[Tap open \u00b7 Dbl back]' }, true),
+    [list(ID.list, LIST_BOX, rows.length ? rows : ['No threads yet'])],
+  );
+}
+
+/** A collapsed section opened: Working, Snoozed, or Settled. */
+export function sectionPage(threads: ThreadSummary[], section: ThreadSection, showEnv: boolean): Page {
+  return page(
+    chrome(
+      { title: SECTION_TITLES[section], meta: `${threads.length} thread${threads.length === 1 ? '' : 's'}`, status: listStatus(threads, ' '), hint: '[Tap open \u00b7 Dbl back]' },
+      true,
+    ),
+    [list(ID.list, LIST_BOX, threads.length ? threads.map((t) => threadRow(t, showEnv)) : ['Nothing here'])],
   );
 }
 

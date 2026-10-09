@@ -34,7 +34,22 @@ export interface T3ThreadShell {
   latestRunId?: string | null;
   pendingRuntimeRequest?: T3PendingRuntimeRequestSummary | null;
   latestVisibleMessage?: T3LatestVisibleMessage | null;
-  lineage?: { parentThreadId: string | null } | null;
+  lineage?: { parentThreadId: string | null; relationshipToParent?: string | null } | null;
+  activeProviderThreadId?: string | null;
+  latestRunRequestedAt?: string | null;
+  latestRunStartedAt?: string | null;
+  latestRunCompletedAt?: string | null;
+  latestUserMessageAt?: string | null;
+  /** Absent on older servers; null when the user never sent a message. */
+  latestUserAuthoredMessageAt?: string | null;
+  interactionMode?: string;
+  hasActionableProposedPlan?: boolean;
+  pendingBackgroundTasks?: { kind: string }[];
+  pinnedAt?: string | null;
+  pinOrderKey?: string | null;
+  activeOrderKey?: string | null;
+  unsettledAt?: string | null;
+  snoozedAt?: string | null;
   settledOverride?: "settled" | "unsettled" | null;
   settledAt?: string | null;
   archivedAt?: string | null;

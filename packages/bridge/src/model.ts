@@ -3,7 +3,6 @@
  * sorted shapes the glasses display.
  */
 import {
-  ATTENTION_ORDER,
   type ApprovalDecision,
   type ApprovalOption,
   type Attention,
@@ -11,6 +10,7 @@ import {
   type PendingRequest,
   type ThreadDetail,
   type ThreadMessage,
+  type ThreadSection,
   type ThreadSummary,
 } from "@t3-glasses/protocol";
 import type { T3Project, T3ThreadProjection, T3ThreadShell, T3TurnItem } from "./t3types.js";
@@ -58,24 +58,6 @@ export function threadAttention(thread: T3ThreadShell): Attention {
   return "idle";
 }
 
-/**
- * Threads worth a row on the glasses: unarchived top-level threads that are
- * not settled, plus any thread (including subagents) that is blocked on the user.
- */
-export function isVisible(thread: T3ThreadShell): boolean {
-  if (thread.archivedAt || thread.deletedAt) return false;
-  const attention = threadAttention(thread);
-  if (attention === "approval" || attention === "question") return true;
-  if (thread.lineage?.parentThreadId) return false;
-  return !isSettled(thread) || attention === "running";
-}
-
-export function compareThreads(a: ThreadSummary, b: ThreadSummary): number {
-  const rank = ATTENTION_ORDER.indexOf(a.attention) - ATTENTION_ORDER.indexOf(b.attention);
-  if (rank !== 0) return rank;
-  return b.updatedAt.localeCompare(a.updatedAt);
-}
-
 export function oneLine(text: string, max: number): string {
   const flat = text.replace(/\s+/g, " ").trim();
   return flat.length > max ? `${flat.slice(0, max - 3).trimEnd()}...` : flat;
@@ -90,6 +72,7 @@ export function summarizeThread(
   thread: T3ThreadShell,
   env: { id: string; label: string },
   projects: ReadonlyMap<string, T3Project>,
+  section: ThreadSection = "active",
 ): ThreadSummary {
   const latest = thread.latestVisibleMessage;
   return {
@@ -100,6 +83,7 @@ export function summarizeThread(
     projectTitle: projects.get(thread.projectId)?.title ?? "",
     status: isWorking(thread) ? "running" : thread.status ?? "idle",
     attention: threadAttention(thread),
+    section,
     updatedAt: latest?.updatedAt && latest.updatedAt > thread.updatedAt ? latest.updatedAt : thread.updatedAt,
     ...(latest?.text ? { preview: oneLine(latest.text, PREVIEW_CHARS) } : {}),
   };
@@ -192,8 +176,9 @@ export function threadDetail(
   env: { id: string; label: string },
   projects: ReadonlyMap<string, T3Project>,
   shell?: T3ThreadShell,
+  section?: ThreadSection,
 ): ThreadDetail {
-  const summary = summarizeThread({ ...projection.thread, ...shell }, env, projects);
+  const summary = summarizeThread({ ...projection.thread, ...shell }, env, projects, section);
   const pending = pendingRequest(projection);
   const runId = activeRunId(projection);
   const activity = runId ? activityLine(projection) : undefined;

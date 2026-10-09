@@ -12,6 +12,7 @@ import {
   type BridgeEvent,
   type HealthResponse,
   type SendMessageRequest,
+  type ThreadSection,
 } from "@t3-glasses/protocol";
 import type { BridgeConfig } from "./config.js";
 import { NotFoundError, type Hub } from "./hub.js";
@@ -20,6 +21,7 @@ import { transcribe, transcriptionAvailable } from "./stt.js";
 export const VERSION = "0.1.0";
 const MAX_JSON_BYTES = 64 * 1024;
 const MAX_AUDIO_BYTES = 16_000 * 2 * 180; // three minutes of 16 kHz s16le mono
+const SECTIONS = new Set<ThreadSection>(["pinned", "active", "working", "snoozed", "settled"]);
 const DECISIONS = new Set<ApprovalDecision>(["accept", "acceptForSession", "acceptAlways", "decline", "cancel"]);
 
 /** The glasses web app, bundled into dist/app at build time. */
@@ -165,9 +167,16 @@ export function createBridgeServer(hub: Hub, config: () => BridgeConfig, pairGla
         send(response, 200, { envs: hub.envs() });
         return;
       }
+      if (route === "GET /api/home") {
+        const limit = Math.min(Math.max(Number(url.searchParams.get("limit")) || 20, 1), 50);
+        send(response, 200, hub.home(url.searchParams.get("env") || undefined, limit));
+        return;
+      }
       if (route === "GET /api/threads") {
         const limit = Math.min(Math.max(Number(url.searchParams.get("limit")) || 20, 1), 50);
-        send(response, 200, { threads: hub.threads(url.searchParams.get("env") || undefined, limit) });
+        const section = url.searchParams.get("section") || undefined;
+        if (section && !SECTIONS.has(section as ThreadSection)) throw new HttpError(400, "Unknown section");
+        send(response, 200, { threads: hub.threads(url.searchParams.get("env") || undefined, limit, section as ThreadSection | undefined) });
         return;
       }
       if (route === "GET /api/events") {

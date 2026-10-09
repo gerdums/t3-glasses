@@ -1,7 +1,7 @@
 /** Wires config, account discovery, paired environments, and the HTTP server together. */
 import type { Server } from "node:http";
 import { ClerkAuth } from "./clerk.js";
-import { loadConfig, redeemGlassesCode, saveConfig, type BridgeConfig } from "./config.js";
+import { loadConfig, readT3WorkingSection, redeemGlassesCode, saveConfig, type BridgeConfig } from "./config.js";
 import { DpopSigner } from "./dpop.js";
 import { BearerAuth, EnvironmentConnection } from "./environment.js";
 import { Hub } from "./hub.js";
@@ -39,7 +39,19 @@ export async function startBridge(options: {
   const log = options.log ?? ((message: string) => console.log(message));
   const config = await loadConfig(options.configPath);
   const persist = (next: BridgeConfig) => saveConfig(next, options.configPath);
-  const hub = new Hub();
+  // Follow T3 desktop's Working beta unless the user chose explicitly; re-read so toggles carry over.
+  let desktopWorking = await readT3WorkingSection();
+  const workingTimer = setInterval(() => {
+    void readT3WorkingSection().then((value) => {
+      if (value === desktopWorking) return;
+      desktopWorking = value;
+      hub.emit("change");
+    });
+  }, 30_000);
+  workingTimer.unref();
+  const workingEnabled = () =>
+    config.workingSection === "on" ? true : config.workingSection === "off" ? false : desktopWorking;
+  const hub = new Hub(workingEnabled);
 
   for (const env of config.environments) {
     hub.add(new EnvironmentConnection(env, new BearerAuth(env.token)));
@@ -110,6 +122,7 @@ export async function startBridge(options: {
     config,
     async stop() {
       clearInterval(discoveryTimer);
+      clearInterval(workingTimer);
       hub.stop();
       await new Promise<void>((resolve) => server.close(() => resolve()));
     },

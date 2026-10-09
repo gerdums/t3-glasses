@@ -45,6 +45,9 @@ export interface EnvSummary {
   threadCount: number;
 }
 
+/** T3 Code's thread list sections, in display order. */
+export type ThreadSection = "pinned" | "active" | "working" | "snoozed" | "settled";
+
 export interface ThreadSummary {
   envId: string;
   envLabel: string;
@@ -54,10 +57,24 @@ export interface ThreadSummary {
   /** Raw T3 thread status, such as "running" or "idle". */
   status: string;
   attention: Attention;
+  section: ThreadSection;
   /** ISO timestamp of the latest change. */
   updatedAt: string;
   /** Short single-line preview of the latest visible message, if any. */
   preview?: string;
+}
+
+/** A collapsed section on Home, like T3's Working, Snoozed, and Settled shelves. */
+export interface Shelf {
+  section: ThreadSection;
+  count: number;
+}
+
+/** Home or one computer's list: open sections inline, the rest as shelves. */
+export interface ThreadListResponse {
+  threads: ThreadSummary[];
+  shelves: Shelf[];
+  workingEnabled: boolean;
 }
 
 export interface ThreadMessage {
@@ -164,8 +181,11 @@ export type BridgeEvent =
  *
  * GET  /api/health                                   -> HealthResponse
  * GET  /api/envs                                     -> { envs: EnvSummary[] }
- * GET  /api/threads?env=<id>&limit=<n>               -> { threads: ThreadSummary[] }
- *      Omit env for every environment's active threads, attention first.
+ * GET  /api/home?env=<id>&limit=<n>                  -> ThreadListResponse
+ *      Pinned and Active threads in T3 Code's order, plus Working/Snoozed/Settled
+ *      shelves. Omit env for every environment.
+ * GET  /api/threads?section=<s>&env=<id>&limit=<n>    -> { threads: ThreadSummary[] }
+ *      One section in T3 Code's order. Omit section for all listed threads.
  * GET  /api/envs/:env/threads/:thread                -> ThreadDetail
  * POST /api/envs/:env/threads/:thread/messages       SendMessageRequest -> OkResponse
  * POST /api/envs/:env/threads/:thread/approval       ApprovalRequest    -> OkResponse
@@ -178,6 +198,7 @@ export type BridgeEvent =
 export const ROUTES = {
   health: "/api/health",
   envs: "/api/envs",
+  home: "/api/home",
   threads: "/api/threads",
   thread: (env: string, thread: string) =>
     `/api/envs/${encodeURIComponent(env)}/threads/${encodeURIComponent(thread)}`,

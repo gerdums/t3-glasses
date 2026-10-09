@@ -75,8 +75,13 @@ Computers you link to T3 Connect later show up on the glasses automatically.
 | Double-tap | Back | Back (closes a card first) |
 | Press and hold | | Record a voice reply; release to stop |
 
-Home lists your threads across all computers, with anything waiting for you on
-top. The last row opens **Computers**, one list per machine.
+Home lists your threads across all computers in the same order as T3 Code:
+**Pinned**, then **Active**, then the collapsed **Working**, **Snoozed**, and
+**Settled** shelves, each opening its own list. The last row opens
+**Computers**, one list per machine.
+
+T3's *Working section (beta)* is a per-device setting. The glasses follow the
+T3 desktop app on the bridge's Mac; override it with `t3-glasses working on|off|auto`.
 
 <p align="center"><img src="docs/screenshots/computers.png" width="49%" alt="Computers" /></p>
 
@@ -88,6 +93,7 @@ Markers: `◆` needs you · `»` running · `×` failed · `•` finished · `·
 t3-glasses setup            Run the guided setup again (safe; finished steps are skipped)
 t3-glasses status           Account, computers, services, and the bridge address
 t3-glasses glasses-code     New pairing QR code
+t3-glasses working on|off|auto   T3's Working section (beta); auto follows T3 desktop
 t3-glasses service restart|status|uninstall
 t3-glasses uninstall        Remove the services, tailnet address, sign-in, and settings
 ```

@@ -14,7 +14,7 @@ import {
   plainText,
   sanitize,
   threadPage,
-  threadsPage,
+  sectionPage,
   wrap,
 } from './render';
 
@@ -26,6 +26,7 @@ const approval: ThreadDetail = {
   projectTitle: 't3code',
   status: 'running',
   attention: 'approval',
+  section: 'active',
   updatedAt: '',
   messages: [
     { role: 'user', text: 'Please fix the flaky login test.', at: '' },
@@ -86,10 +87,10 @@ describe('conversation paging', () => {
 describe('screens', () => {
   it('home lists every thread with a Computers row, within the container budget', () => {
     const summary: ThreadSummary = { ...approval };
-    const page = homePage([summary], envs, '\u2022 Connected');
+    const page = homePage({ threads: [summary], shelves: [{ section: 'working', count: 2 }, { section: 'settled', count: 9 }], workingEnabled: true }, envs, '\u2022 Connected');
     const rows = page.listObject?.[0]?.itemContainer?.itemName ?? [];
     expect(rows[0]).toContain('\u25c6 M4 Studio \u203a Fix');
-    expect(rows.at(-1)).toContain('Computers \u00b7 1/2 online');
+    expect(rows.slice(1)).toEqual(['\u203a Working \u00b7 2', '\u203a Settled \u00b7 9', '\u203a Computers \u00b7 1/2 online']);
     expect(page.listObject?.[0]?.itemContainer?.isItemSelectBorderEn).toBe(1);
     expect((page.textObject?.length ?? 0) + (page.listObject?.length ?? 0)).toBeLessThanOrEqual(8);
     expect(allText(page)).toContain('1 needs you');
@@ -103,14 +104,14 @@ describe('screens', () => {
 
   it('keeps list rows within the 63-byte firmware limit', () => {
     const long: ThreadSummary = { ...approval, title: '\u25c6\u203a'.repeat(40) };
-    for (const row of threadsPage([long], 'Inbox', true).listObject?.[0]?.itemContainer?.itemName ?? []) {
+    for (const row of sectionPage([long], 'settled', true).listObject?.[0]?.itemContainer?.itemName ?? []) {
       expect(new TextEncoder().encode(row).length).toBeLessThanOrEqual(63);
     }
   });
 
-  it('threads page marks attention', () => {
+  it('section page marks attention', () => {
     const summary: ThreadSummary = { ...approval };
-    const page = threadsPage([summary], 'Inbox', true);
+    const page = sectionPage([summary], 'working', true);
     expect(page.listObject?.[0]?.itemContainer?.itemName?.[0]).toContain('◆ M4 Studio › Fix');
   });
 

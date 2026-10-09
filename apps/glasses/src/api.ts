@@ -1,9 +1,10 @@
-import { ROUTES, type AnswerRequest, type ApprovalRequest, type BridgeEvent, type EnvSummary, type HealthResponse, type OkResponse, type SendMessageRequest, type ThreadDetail, type ThreadSummary, type TranscribeResponse } from '@t3-glasses/protocol';
+import { ROUTES, type AnswerRequest, type ApprovalRequest, type BridgeEvent, type EnvSummary, type HealthResponse, type OkResponse, type SendMessageRequest, type ThreadDetail, type ThreadListResponse, type ThreadSection, type ThreadSummary, type TranscribeResponse } from '@t3-glasses/protocol';
 
 export interface BridgeApi {
   health(): Promise<HealthResponse>;
   envs(): Promise<EnvSummary[]>;
-  threads(env?: string, limit?: number): Promise<ThreadSummary[]>;
+  home(env?: string, limit?: number): Promise<ThreadListResponse>;
+  threads(env?: string, limit?: number, section?: ThreadSection): Promise<ThreadSummary[]>;
   thread(env: string, thread: string): Promise<ThreadDetail>;
   send(env: string, thread: string, body: SendMessageRequest): Promise<OkResponse>;
   approval(env: string, thread: string, body: ApprovalRequest): Promise<OkResponse>;
@@ -40,7 +41,17 @@ export class HttpBridgeApi implements BridgeApi {
   }
   health() { return this.request<HealthResponse>(ROUTES.health); }
   async envs() { return (await this.request<{envs: EnvSummary[]}>(ROUTES.envs)).envs; }
-  async threads(env?: string, limit = 20) { const query = new URLSearchParams({ limit: String(limit) }); if (env) query.set('env', env); return (await this.request<{threads: ThreadSummary[]}>(`${ROUTES.threads}?${query}`)).threads; }
+  home(env?: string, limit = 20) {
+    const query = new URLSearchParams({ limit: String(limit) });
+    if (env) query.set('env', env);
+    return this.request<ThreadListResponse>(`${ROUTES.home}?${query}`);
+  }
+  async threads(env?: string, limit = 20, section?: ThreadSection) {
+    const query = new URLSearchParams({ limit: String(limit) });
+    if (env) query.set('env', env);
+    if (section) query.set('section', section);
+    return (await this.request<{ threads: ThreadSummary[] }>(`${ROUTES.threads}?${query}`)).threads;
+  }
   thread(env: string, thread: string) { return this.request<ThreadDetail>(ROUTES.thread(env, thread)); }
   send(env: string, thread: string, body: SendMessageRequest) { return this.request<OkResponse>(ROUTES.messages(env, thread), 'POST', body); }
   approval(env: string, thread: string, body: ApprovalRequest) { return this.request<OkResponse>(ROUTES.approval(env, thread), 'POST', body); }

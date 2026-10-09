@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { isVisible, pendingRequest, threadAttention, threadDetail } from "../src/model.js";
+import { pendingRequest, threadAttention, threadDetail } from "../src/model.js";
 import type { T3ThreadProjection, T3ThreadShell } from "../src/t3types.js";
 
 const shell = (over: Partial<T3ThreadShell> = {}): T3ThreadShell => ({
@@ -24,18 +24,6 @@ describe("attention", () => {
     expect(threadAttention(shell({ status: "failed" }))).toBe("failed");
     expect(threadAttention(shell({ status: "completed" }))).toBe("done");
     expect(threadAttention(shell({ status: "completed", settledOverride: "settled" }))).toBe("idle");
-  });
-});
-
-describe("visibility", () => {
-  it("hides settled, archived, and subagent threads unless they need the user", () => {
-    expect(isVisible(shell({ settledAt: "x" }))).toBe(false);
-    expect(isVisible(shell({ archivedAt: "x" }))).toBe(false);
-    expect(isVisible(shell({ lineage: { parentThreadId: "parent" } }))).toBe(false);
-    expect(
-      isVisible(shell({ lineage: { parentThreadId: "parent" }, pendingRuntimeRequest: { id: "r", kind: "command", createdAt: "" } })),
-    ).toBe(true);
-    expect(isVisible(shell())).toBe(true);
   });
 });
 

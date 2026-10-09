@@ -10,6 +10,7 @@ import {
   defaultConfigPath,
   issueGlassesCode,
   loadConfig,
+  readT3WorkingSection,
   newGlassesToken,
   removeEnvironment,
   saveConfig,
@@ -58,6 +59,7 @@ More:
   t3-glasses setup --no-voice       Skip local voice transcription
   t3-glasses serve [--host H] [--port P]   Run the bridge in the foreground
   t3-glasses expose                 Publish the bridge on your tailnet over HTTPS
+  t3-glasses working auto|on|off   T3's "Working section (beta)": auto follows the T3 desktop app
   t3-glasses transcription openai [--model M] [--api-key-env VAR] | command -- <cmd> | none
   t3-glasses pair <pairing link>    Add a computer that is not on T3 Connect
   t3-glasses unpair <id|label>
@@ -248,6 +250,9 @@ async function status(config: BridgeConfig): Promise<void> {
     console.log(`    voice service:  ${await agentStatus(WHISPER_LABEL)}`);
   }
   console.log(`    transcription:  ${config.transcription.provider}`);
+  const desktop = await readT3WorkingSection();
+  const mode = config.workingSection ?? "auto";
+  console.log(`    working section: ${mode}${mode === "auto" ? ` (T3 desktop: ${desktop ? "on" : "off"})` : ""}`);
 }
 
 // ---- Commands -------------------------------------------------------------------
@@ -336,6 +341,17 @@ async function main(): Promise<void> {
       if (!rest[0]) throw new Error("Usage: t3-glasses unpair <id|label>");
       await persist(removeEnvironment(config, rest[0]));
       console.log("Removed.");
+      return;
+    }
+    case "working": {
+      const value = rest[0];
+      if (value !== "auto" && value !== "on" && value !== "off") {
+        throw new Error("Usage: t3-glasses working <auto|on|off>");
+      }
+      config.workingSection = value;
+      await persist(config);
+      if (isMac()) await restartAgent(BRIDGE_LABEL).catch(() => {});
+      console.log(`Working section: ${value}${value === "auto" ? " (follows the T3 desktop app on this computer)" : ""}`);
       return;
     }
     case "transcription": {

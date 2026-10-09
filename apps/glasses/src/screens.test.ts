@@ -13,6 +13,7 @@ const detail: ThreadDetail = {
   projectTitle: 'T3',
   status: 'running',
   attention: 'approval',
+  section: 'active',
   updatedAt: '',
   messages: [{ role: 'assistant', text: 'May I run the tests?', at: '' }],
   canInterrupt: true,
@@ -30,6 +31,7 @@ function harness() {
   const api = {
     health: vi.fn(async () => ({ ok: true, version: 'test', protocol: 1, transcription: true })),
     envs: vi.fn(async () => [{ id: 'm4', label: 'M4', connected: true, threadCount: 1, attention: { approval: 1, question: 0, failed: 0, running: 0 } }]),
+    home: vi.fn(async (env?: string) => ({ threads: [detail], shelves: env ? [] : [{ section: 'settled', count: 4 }], workingEnabled: true })),
     threads: vi.fn(async () => [detail]),
     thread: vi.fn(async () => detail),
     approval: vi.fn(async () => ({ ok: true })),
@@ -56,6 +58,23 @@ describe('state machine', () => {
 });
 
 describe('glasses app', () => {
+  it('opens a shelf like T3 Code and returns to Home', async () => {
+    const { app, api } = harness();
+    await app.start();
+    await app.handle(click(1)); // Settled shelf
+    expect(app.state.screen).toBe('Section');
+    expect(app.state.section).toBe('settled');
+    expect(api.threads).toHaveBeenCalledWith(undefined, 20, 'settled');
+    await app.handle(click(0));
+    expect(app.state.screen).toBe('Thread');
+    const back = { sysEvent: new Sys_ItemEvent({ eventType: OsEventTypeList.DOUBLE_CLICK_EVENT }) };
+    await app.handle(back);
+    expect(app.state.screen).toBe('Section');
+    await app.handle(back);
+    expect(app.state.screen).toBe('Home');
+    await app.stop();
+  });
+
   it('opens a thread and approves from the card', async () => {
     const { app, api } = harness();
     await app.start();
@@ -84,7 +103,7 @@ describe('glasses app', () => {
   it('reaches a computer through the Computers row and returns there', async () => {
     const { app } = harness();
     await app.start();
-    await app.handle(click(1)); // the Computers row after one thread
+    await app.handle(click(2)); // one thread, the Settled shelf, then Computers
     expect(app.state.screen).toBe('Computers');
     await app.handle(click(0)); // M4
     expect(app.state.screen).toBe('Threads');

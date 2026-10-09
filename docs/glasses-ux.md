@@ -18,15 +18,19 @@ firmware's native list selection box.
 
 ## Screens
 
-1. **Home**: every computer's threads, attention first (approvals and
-   questions, then running, failed, finished, idle), then a final
-   `› Computers` row. Title meta shows the thread count.
+1. **Home**: every computer's threads in T3 Code's order (ported from its
+   client runtime, `packages/bridge/src/sections.ts`): Pinned by saved order,
+   Active (by saved order, or by when each thread last came back to you when
+   the Working beta is on), then shelf rows for Working, Snoozed, and Settled,
+   then `› Computers`. Archived threads and subagents are hidden.
 2. **Computers**: one row per machine with its counts, or `offline`.
-3. **Threads**: one computer's threads.
-4. **Thread**: the conversation as prose (Markdown stripped), user turns
+3. **Threads**: one computer's threads, with the same shelves.
+4. **Section**: an opened shelf, in T3's order for it (Working by last send,
+   Snoozed by soonest wake, Settled by most recently finished).
+5. **Thread**: the conversation as prose (Markdown stripped), user turns
    marked `›`. Scrolling past either end pages through older history; the
    footer shows the live activity line while the agent works.
-5. **Cards** over a thread:
+6. **Cards** over a thread:
    - actions: an approval's prompt and its provider options, a question and
      its choices plus `Speak an answer`, then `Reply by voice`, `Interrupt`
      (while running), `Back`

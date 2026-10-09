@@ -10,12 +10,13 @@ import type { BridgeApi } from './api';
 import {
   TRANSCRIPT_ITEMS,
   actionItems,
+  computerThreadsPage,
   computersPage,
   homePage,
-  homeThreadCount,
+  listRows,
+  sectionPage,
   messagePage,
   threadPage,
-  threadsPage,
   type Action,
   type ActionItem,
   type Card,
@@ -119,10 +120,13 @@ export class GlassesApp {
     }
     if (s.screen === 'Threads') {
       const env = s.envs.find((e) => e.id === s.envFilter);
-      return threadsPage(s.threads, env?.label ?? 'Threads', false);
+      return computerThreadsPage(s.computer, env?.label ?? 'Threads');
+    }
+    if (s.screen === 'Section' && s.section) {
+      return sectionPage(s.sectionThreads, s.section, !(s.sectionFrom === 'Threads' && s.envFilter));
     }
     if (s.screen === 'Computers') return computersPage(s.envs, s.connection);
-    return homePage(s.inbox, s.envs, s.connection);
+    return homePage(s.home, s.envs, s.connection);
   }
 
   private async display() {
@@ -191,16 +195,21 @@ export class GlassesApp {
     const stale = () => generation !== this.generation || this.state.screen !== screen;
     try {
       if (screen === 'Home' || screen === 'Computers') {
-        const [envs, inbox] = await Promise.all([this.api.envs(), screen === 'Home' ? this.api.threads(undefined, 19) : undefined]);
+        const [envs, home] = await Promise.all([this.api.envs(), screen === 'Home' ? this.api.home(undefined, 20) : undefined]);
         if (stale()) return;
         const online = envs.filter((env) => env.connected).length;
         this.dispatch({ type: 'ENVS', envs });
-        if (inbox) this.dispatch({ type: 'INBOX', inbox });
-        this.dispatch({ type: 'CONNECTION', text: `• Connected · ${online} of ${envs.length} online` });
+        if (home) this.dispatch({ type: 'HOME', home });
+        this.dispatch({ type: 'CONNECTION', text: `\u2022 Connected \u00b7 ${online} of ${envs.length} online` });
       } else if (screen === 'Threads') {
-        const threads = await this.api.threads(this.state.envFilter, 20);
+        const computer = await this.api.home(this.state.envFilter, 20);
         if (stale()) return;
-        this.dispatch({ type: 'THREADS', threads });
+        this.dispatch({ type: 'COMPUTER', computer });
+      } else if (screen === 'Section' && this.state.section) {
+        const env = this.state.sectionFrom === 'Threads' ? this.state.envFilter : undefined;
+        const threads = await this.api.threads(env, 20, this.state.section);
+        if (stale()) return;
+        this.dispatch({ type: 'SECTION_THREADS', threads });
       } else if (this.state.detail) {
         const { envId, id } = this.state.detail;
         const detail = await this.api.thread(envId, id);
@@ -366,11 +375,13 @@ export class GlassesApp {
     if (type !== OsEventTypeList.CLICK_EVENT) return;
     const index = event.listEvent?.currentSelectItemIndex ?? 0;
 
-    if (s.screen === 'Home') {
-      if (index < homeThreadCount(s.inbox)) {
-        await this.openThread(s.inbox[index]);
+    if (s.screen === 'Home' || s.screen === 'Threads') {
+      const row = listRows(s.screen === 'Home' ? s.home : s.computer, s.screen === 'Home')[index];
+      if (!row) return;
+      if (row.kind === 'thread') {
+        await this.openThread(row.thread);
       } else {
-        this.dispatch({ type: 'OPEN_COMPUTERS' });
+        this.dispatch(row.kind === 'shelf' ? { type: 'OPEN_SECTION', section: row.section } : { type: 'OPEN_COMPUTERS' });
         await this.display();
         await this.refresh();
       }
@@ -384,8 +395,8 @@ export class GlassesApp {
       await this.refresh();
       return;
     }
-    if (s.screen === 'Threads') {
-      await this.openThread(s.threads[index]);
+    if (s.screen === 'Section') {
+      await this.openThread(s.sectionThreads[index]);
       return;
     }
     // Thread screen.

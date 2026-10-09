@@ -7,11 +7,18 @@ import type {
   ApprovalDecision,
   EnvSummary,
   SendMode,
+  Shelf,
   ThreadDetail,
+  ThreadListResponse,
+  ThreadSection,
   ThreadSummary,
 } from "@t3-glasses/protocol";
 import type { EnvironmentConnection } from "./environment.js";
-import { activeRunId, compareThreads, countAttention, isVisible, summarizeThread, threadDetail } from "./model.js";
+import { activeRunId, countAttention, summarizeThread, threadDetail } from "./model.js";
+import { InboxReturnTracker, SECTION_ORDER, buildSections, sectionOf, type ScopedShell, type SectionedThreads } from "./sections.js";
+
+/** Sections shown inline on Home; the others collapse into shelves, as in T3 Code. */
+const INLINE_SECTIONS: readonly ThreadSection[] = ["pinned", "active"];
 
 export class NotFoundError extends Error {
   constructor(message: string) {
@@ -23,6 +30,15 @@ export class NotFoundError extends Error {
 export class Hub extends EventEmitter {
   private readonly connections = new Map<string, EnvironmentConnection>();
   private changeTimer: NodeJS.Timeout | null = null;
+  /** One tracker across every environment, like T3's module-scoped tracker. */
+  private readonly tracker = new InboxReturnTracker();
+
+  /** Whether T3's "Working section (beta)" is on for this user. */
+  constructor(private readonly workingEnabled: () => boolean = () => false) {
+    super();
+    // Observe on every change so a thread's return to the inbox is stamped when it happens.
+    this.on("change", () => this.sectioned());
+  }
 
   list(): EnvironmentConnection[] {
     return [...this.connections.values()];
@@ -52,31 +68,48 @@ export class Hub extends EventEmitter {
   }
 
   envs(): EnvSummary[] {
+    const sections = this.sectioned();
     return this.list()
       .map((connection) => {
-        const threads = this.summaries(connection);
+        const mine = this.summaries(sections, connection.id);
+        const open = mine.filter((thread) => thread.section !== "settled" && thread.section !== "snoozed");
         return {
           id: connection.id,
           label: connection.label,
           connected: connection.connected,
           ...(connection.error && !connection.connected ? { error: connection.error } : {}),
-          attention: countAttention(threads),
-          threadCount: threads.length,
+          attention: countAttention(mine),
+          threadCount: open.length,
         };
       })
       .sort((a, b) => Number(b.connected) - Number(a.connected) || a.label.localeCompare(b.label));
   }
 
-  threads(envId?: string, limit = 20): ThreadSummary[] {
-    const connections = envId ? [this.require(envId)] : this.list();
-    const all = connections.flatMap((connection) => this.summaries(connection));
-    return all.sort(compareThreads).slice(0, limit);
+  /** Pinned and Active threads inline, then the other sections as shelves. */
+  home(envId?: string, limit = 20): ThreadListResponse {
+    if (envId) this.require(envId);
+    const sections = this.sectioned();
+    const workingEnabled = this.workingEnabled();
+    const threads = this.summaries(sections, envId, INLINE_SECTIONS).slice(0, limit);
+    const shelves: Shelf[] = SECTION_ORDER.filter((section) => !INLINE_SECTIONS.includes(section))
+      .filter((section) => section !== "working" || workingEnabled)
+      .map((section) => ({ section, count: this.summaries(sections, envId, [section]).length }))
+      .filter((shelf) => shelf.count > 0);
+    return { threads, shelves, workingEnabled };
+  }
+
+  /** One section, or every listed thread in section order. */
+  threads(envId?: string, limit = 20, section?: ThreadSection): ThreadSummary[] {
+    if (envId) this.require(envId);
+    return this.summaries(this.sectioned(), envId, section ? [section] : SECTION_ORDER).slice(0, limit);
   }
 
   async thread(envId: string, threadId: string): Promise<ThreadDetail> {
     const connection = this.require(envId);
     const projection = await connection.getThreadProjection(threadId);
-    return threadDetail(projection, connection, connection.projects, connection.threads.get(threadId));
+    const shell = connection.threads.get(threadId);
+    const section = shell ? sectionOf(shell, this.workingEnabled()) : undefined;
+    return threadDetail(projection, connection, connection.projects, shell, section);
   }
 
   async send(envId: string, threadId: string, text: string, mode: SendMode = "auto"): Promise<void> {
@@ -100,10 +133,23 @@ export class Hub extends EventEmitter {
     return true;
   }
 
-  private summaries(connection: EnvironmentConnection): ThreadSummary[] {
-    return [...connection.threads.values()]
-      .filter(isVisible)
-      .map((thread) => summarizeThread(thread, connection, connection.projects));
+  /** Every environment's threads in T3 Code's sections and order. */
+  private sectioned(): SectionedThreads {
+    const items: ScopedShell[] = this.list().flatMap((connection) =>
+      [...connection.threads.values()].map((shell) => ({ environmentId: connection.id, shell })),
+    );
+    return buildSections(items, { workingEnabled: this.workingEnabled(), tracker: this.tracker });
+  }
+
+  private summaries(sections: SectionedThreads, envId?: string, which: readonly ThreadSection[] = SECTION_ORDER): ThreadSummary[] {
+    return which.flatMap((section) =>
+      sections[section]
+        .filter((item) => !envId || item.environmentId === envId)
+        .flatMap((item) => {
+          const connection = this.connections.get(item.environmentId);
+          return connection ? [summarizeThread(item.shell, connection, connection.projects, section)] : [];
+        }),
+    );
   }
 
   private require(envId: string): EnvironmentConnection {
