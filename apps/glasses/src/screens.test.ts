@@ -18,3 +18,16 @@ describe('screen transitions', () => {
     expect(callback).toBeDefined(); await app.stop();
   });
 });
+describe('click normalization', () => {
+  it('treats a system event without eventType as a click', async () => {
+    const bridge = { onEvenHubEvent: vi.fn(() => () => {}), createStartUpPageContainer: vi.fn(async () => StartUpPageCreateResult.success), rebuildPageContainer: vi.fn(async () => true), textContainerUpgrade: vi.fn(async () => true), audioControl: vi.fn(async () => true) } as unknown as EvenAppBridge;
+    const api = { health: vi.fn(async () => ({ ok: true, version: 'mock', protocol: 1, transcription: true })), envs: vi.fn(async () => []), threads: vi.fn(async () => [detail]), thread: vi.fn(async () => detail) } as unknown as BridgeApi;
+    const app = new GlassesApp(bridge, api); await app.start();
+    await app.handle({ listEvent: new List_ItemEvent({ currentSelectItemIndex: 0 }) });
+    await app.handle({ listEvent: new List_ItemEvent({ currentSelectItemIndex: 0 }) });
+    expect(app.state.screen).toBe('Thread');
+    await app.handle({ sysEvent: new Sys_ItemEvent({ eventSource: 1 }) });
+    expect(app.state.screen).toBe('Actions');
+    await app.stop();
+  });
+});

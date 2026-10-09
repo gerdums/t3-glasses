@@ -4,11 +4,16 @@ import { actionItems, actionsPage, homePage, messagePage, threadPage, threadText
 import { initialState, transition, type Intent, type State } from './screens';
 import { VoiceCapture } from './voice';
 
-const eventType = (event: EvenHubEvent) => OsEventTypeList.fromJson(event.listEvent?.eventType ?? event.textEvent?.eventType ?? event.sysEvent?.eventType ?? (event.listEvent || event.textEvent ? 0 : undefined));
+// Protobuf omits zero values, so a click (CLICK_EVENT = 0) arrives with no eventType at all.
+const eventType = (event: EvenHubEvent) => {
+  const source = event.listEvent ?? event.textEvent ?? (event.sysEvent && !event.sysEvent.imuData ? event.sysEvent : undefined);
+  return source ? OsEventTypeList.fromJson(source.eventType ?? 0) : undefined;
+};
 export class GlassesApp {
   state: State = initialState();
   private voice: VoiceCapture;
-  private created = false;
+  /** The SDK allows one startup page per app launch; later apps must rebuild. */
+  private static pageCreated = false;
   private lastPage?: Page;
   private timer?: ReturnType<typeof setInterval>;
   private confirmTimer?: ReturnType<typeof setTimeout>;
@@ -32,10 +37,13 @@ export class GlassesApp {
       : s.screen === 'Actions' ? actionsPage(s.actions)
       : s.screen === 'Voice' ? messagePage(s.recording ? 'Listening... release to stop' : s.transcript ? `${s.transcript}\n\nClick: send  Double: cancel` : 'Transcribing...')
       : messagePage(s.confirm);
-    if (!this.created) {
+    if (!GlassesApp.pageCreated) {
       const result = await this.bridge.createStartUpPageContainer(page);
-      if (result !== StartUpPageCreateResult.success) throw new Error(`Glasses page failed: ${result}`);
-      this.created = true;
+      // `invalid` also means a page already exists, e.g. after the WebView reloads: rebuild it instead.
+      if (result === StartUpPageCreateResult.invalid) {
+        if (!await this.bridge.rebuildPageContainer(page)) throw new Error('Glasses page rebuild failed');
+      } else if (result !== StartUpPageCreateResult.success) throw new Error(`Glasses page failed: ${result}`);
+      GlassesApp.pageCreated = true;
     } else {
       const old = this.lastPage;
       if (old && JSON.stringify(old) === JSON.stringify(page)) return;
@@ -73,7 +81,7 @@ export class GlassesApp {
         const sameLayout = this.state.screen === 'Thread' && JSON.stringify(this.state.actions) === JSON.stringify(newActions) && detail.status === old.status && detail.envLabel === old.envLabel;
         this.dispatch({ type: 'DETAIL', detail }); this.dispatch({ type: 'ACTIONS', actions: newActions });
         if (sameLayout) {
-          if (threadText(detail, 2000) !== threadText(old, 2000) && !await this.bridge.textContainerUpgrade(new TextContainerUpgrade({ containerID: 1, containerName: 'thread', content: threadText(detail, 2000) }))) throw new Error('Glasses text update failed');
+          if (threadText(detail) !== threadText(old) && !await this.bridge.textContainerUpgrade(new TextContainerUpgrade({ containerID: 1, containerName: 'thread', content: threadText(detail) }))) throw new Error('Glasses text update failed');
           this.lastPage = threadPage(detail, newActions);
         } else await this.display();
       }
