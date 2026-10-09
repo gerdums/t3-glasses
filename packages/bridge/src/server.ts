@@ -18,7 +18,7 @@ import type { BridgeConfig } from "./config.js";
 import { NotFoundError, type Hub } from "./hub.js";
 import { transcribe, transcriptionAvailable } from "./stt.js";
 
-export const VERSION = "0.1.0";
+export const VERSION = "0.2.0";
 const MAX_JSON_BYTES = 64 * 1024;
 const MAX_AUDIO_BYTES = 16_000 * 2 * 180; // three minutes of 16 kHz s16le mono
 const SECTIONS = new Set<ThreadSection>(["pinned", "active", "working", "snoozed", "settled"]);

@@ -1,6 +1,6 @@
 {
   "name": "@t3-glasses/bridge",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "description": "Bridge between T3 Code environments and the t3-glasses Even Hub app",
   "type": "module",
@@ -14,7 +14,7 @@
     "start": "node dist/cli.js serve"
   },
   "dependencies": {
-    "@t3-glasses/protocol": "0.1.0",
+    "@t3-glasses/protocol": "0.2.0",
     "qrcode-terminal": "^0.12.0"
   },
   "devDependencies": {

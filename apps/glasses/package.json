@@ -1,6 +1,6 @@
 {
   "name": "@t3-glasses/glasses",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "type": "module",
   "scripts": {
@@ -13,7 +13,7 @@
   "dependencies": {
     "@evenrealities/even_hub_sdk": "^0.0.16",
     "@evenrealities/pretext": "^0.1.4",
-    "@t3-glasses/protocol": "0.1.0"
+    "@t3-glasses/protocol": "0.2.0"
   },
   "devDependencies": {
     "@evenrealities/evenhub-cli": "^0.1.14",
