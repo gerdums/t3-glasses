@@ -165,7 +165,7 @@ export type BridgeEvent =
  * GET  /api/health                                   -> HealthResponse
  * GET  /api/envs                                     -> { envs: EnvSummary[] }
  * GET  /api/threads?env=<id>&limit=<n>               -> { threads: ThreadSummary[] }
- *      Omit env for an all-environment inbox sorted by attention.
+ *      Omit env for every environment's active threads, attention first.
  * GET  /api/envs/:env/threads/:thread                -> ThreadDetail
  * POST /api/envs/:env/threads/:thread/messages       SendMessageRequest -> OkResponse
  * POST /api/envs/:env/threads/:thread/approval       ApprovalRequest    -> OkResponse

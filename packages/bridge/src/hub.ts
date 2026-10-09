@@ -70,9 +70,7 @@ export class Hub extends EventEmitter {
   threads(envId?: string, limit = 20): ThreadSummary[] {
     const connections = envId ? [this.require(envId)] : this.list();
     const all = connections.flatMap((connection) => this.summaries(connection));
-    // The cross-environment inbox shows what needs the user, not idle history.
-    const filtered = envId ? all : all.filter((thread) => thread.attention !== "idle");
-    return filtered.sort(compareThreads).slice(0, limit);
+    return all.sort(compareThreads).slice(0, limit);
   }
 
   async thread(envId: string, threadId: string): Promise<ThreadDetail> {

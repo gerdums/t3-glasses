@@ -1,5 +1,6 @@
 #!/usr/bin/env node
 import { createInterface } from "node:readline/promises";
+import { fileURLToPath } from "node:url";
 import { parseArgs } from "node:util";
 import { accountFromConfig, startBridge } from "./bridge.js";
 import { ClerkAuth, DEFAULT_CLERK_FRONTEND_API } from "./clerk.js";
@@ -16,6 +17,7 @@ import {
 import { generateDpopKey } from "./dpop.js";
 import { pairEnvironment } from "./pairing.js";
 import { DEFAULT_RELAY_URL } from "./relay.js";
+import { exposeOnTailnet, installService, restartService, serviceLogPath, serviceStatus, uninstallService } from "./service.js";
 
 const HELP = `t3-glasses: T3 Code threads on Even Realities G2 glasses
 
@@ -26,6 +28,9 @@ Usage:
   t3-glasses serve [--host H] [--port P]
                                     Run the bridge
   t3-glasses status                 Show the account, environments, and glasses settings
+  t3-glasses service install        Run the bridge at login and keep it running (macOS)
+  t3-glasses service uninstall|restart|status
+  t3-glasses expose                 Publish the bridge on your tailnet over HTTPS
   t3-glasses token [--rotate]       Print (or replace) the glasses token
   t3-glasses pair <pairing link>    Add a machine that is not on T3 Connect
   t3-glasses unpair <id|label>      Remove a directly paired machine
@@ -162,7 +167,31 @@ async function main(): Promise<void> {
     case "status":
       await showEnvironments(config);
       showGlassesInfo(config);
+      if (process.platform === "darwin") console.log(`\nService: ${await serviceStatus()}`);
       return;
+    case "service": {
+      const action = rest[0];
+      if (action === "install") {
+        const path = await installService(fileURLToPath(import.meta.url));
+        console.log(`Installed ${path}\nLogs: ${serviceLogPath()}`);
+      } else if (action === "uninstall") {
+        await uninstallService();
+        console.log("Service removed.");
+      } else if (action === "restart") {
+        await restartService();
+        console.log("Restarted.");
+      } else if (action === "status") {
+        console.log(await serviceStatus());
+      } else {
+        throw new Error("Usage: t3-glasses service <install|uninstall|restart|status>");
+      }
+      return;
+    }
+    case "expose": {
+      const url = await exposeOnTailnet(config.port);
+      console.log(`Bridge URL: ${url}`);
+      return;
+    }
     case "token": {
       const { values } = parseArgs({ args: rest, options: { rotate: { type: "boolean" } } });
       if (values.rotate) {
