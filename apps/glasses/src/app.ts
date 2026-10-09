@@ -5,11 +5,14 @@ import {
   type EvenAppBridge,
   type EvenHubEvent,
 } from '@evenrealities/even_hub_sdk';
+import type { ThreadSummary } from '@t3-glasses/protocol';
 import type { BridgeApi } from './api';
 import {
   TRANSCRIPT_ITEMS,
   actionItems,
+  computersPage,
   homePage,
+  homeThreadCount,
   threadPage,
   threadsPage,
   type Action,
@@ -86,10 +89,11 @@ export class GlassesApp {
       return threadPage(s.detail, { page: s.page, card: s.card, items: actionItems(s.detail) });
     }
     if (s.screen === 'Threads') {
-      const env = s.envFilter ? s.envs.find((e) => e.id === s.envFilter) : undefined;
-      return threadsPage(s.threads, env?.label ?? 'Inbox', !s.envFilter);
+      const env = s.envs.find((e) => e.id === s.envFilter);
+      return threadsPage(s.threads, env?.label ?? 'Threads', false);
     }
-    return homePage(s.envs, s.inbox, s.connection);
+    if (s.screen === 'Computers') return computersPage(s.envs, s.connection);
+    return homePage(s.inbox, s.envs, s.connection);
   }
 
   private async display() {
@@ -164,11 +168,12 @@ export class GlassesApp {
     const screen = this.state.screen;
     const stale = () => generation !== this.generation || this.state.screen !== screen;
     try {
-      if (screen === 'Home') {
-        const [envs, inbox] = await Promise.all([this.api.envs(), this.api.threads(undefined, 20)]);
+      if (screen === 'Home' || screen === 'Computers') {
+        const [envs, inbox] = await Promise.all([this.api.envs(), screen === 'Home' ? this.api.threads(undefined, 19) : undefined]);
         if (stale()) return;
         const online = envs.filter((env) => env.connected).length;
-        this.dispatch({ type: 'ENVS', envs, inbox });
+        this.dispatch({ type: 'ENVS', envs });
+        if (inbox) this.dispatch({ type: 'INBOX', inbox });
         this.dispatch({ type: 'CONNECTION', text: `• Connected · ${online} of ${envs.length} online` });
       } else if (screen === 'Threads') {
         const threads = await this.api.threads(this.state.envFilter, 20);
@@ -188,12 +193,11 @@ export class GlassesApp {
     } catch (error) {
       if (stale()) return;
       this.dispatch({ type: 'CONNECTION', text: `× ${messageOf(error)}` });
-      if (screen === 'Home') await this.display();
+      if (screen === 'Home' || screen === 'Computers') await this.display();
     }
   }
 
-  private async openThread(index: number) {
-    const summary = this.state.threads[index];
+  private async openThread(summary: ThreadSummary | undefined) {
     if (!summary) return;
     const detail = await this.api.thread(summary.envId, summary.id);
     this.dispatch({ type: 'OPEN_THREAD', detail });
@@ -341,15 +345,25 @@ export class GlassesApp {
     const index = event.listEvent?.currentSelectItemIndex ?? 0;
 
     if (s.screen === 'Home') {
-      const env = index === 0 ? undefined : s.envs[index - 1];
-      if (index > 0 && !env) return;
-      this.dispatch({ type: 'OPEN_THREADS', env: env?.id });
+      if (index < homeThreadCount(s.inbox)) {
+        await this.openThread(s.inbox[index]);
+      } else {
+        this.dispatch({ type: 'OPEN_COMPUTERS' });
+        await this.display();
+        await this.refresh();
+      }
+      return;
+    }
+    if (s.screen === 'Computers') {
+      const env = s.envs[index];
+      if (!env) return;
+      this.dispatch({ type: 'OPEN_THREADS', env: env.id });
       await this.display();
       await this.refresh();
       return;
     }
     if (s.screen === 'Threads') {
-      await this.openThread(index);
+      await this.openThread(s.threads[index]);
       return;
     }
     // Thread screen.

@@ -6,10 +6,12 @@ import {
   BODY_WRAP_PX,
   MAX_TEXT_BYTES,
   actionItems,
+  computersPage,
   conversationLines,
   conversationPage,
   homePage,
   menu,
+  plainText,
   sanitize,
   threadPage,
   threadsPage,
@@ -61,6 +63,14 @@ describe('text', () => {
   });
 });
 
+describe('markdown', () => {
+  it('renders as plain prose', () => {
+    expect(plainText('## Done\n- **1.8** shipped with `npm test`\n- See [the PR](https://x.y/1)')).toBe(
+      'Done\n\u2022 1.8 shipped with npm test\n\u2022 See the PR',
+    );
+  });
+});
+
 describe('conversation paging', () => {
   it('shows the newest lines first and pages back in time', () => {
     const lines = conversationLines(approval);
@@ -74,15 +84,21 @@ describe('conversation paging', () => {
 });
 
 describe('screens', () => {
-  it('home lists the inbox and every environment within the container budget', () => {
-    const page = homePage(envs, 3, '• Connected');
+  it('home lists every thread with a Computers row, within the container budget', () => {
+    const summary: ThreadSummary = { ...approval };
+    const page = homePage([summary], envs, '\u2022 Connected');
     const rows = page.listObject?.[0]?.itemContainer?.itemName ?? [];
-    expect(rows[0]).toContain('Inbox');
-    expect(rows[1]).toContain('M4 Studio');
-    expect(rows[2]).toContain('offline');
+    expect(rows[0]).toContain('\u25c6 M4 Studio \u203a Fix');
+    expect(rows.at(-1)).toContain('Computers \u00b7 1/2 online');
     expect(page.listObject?.[0]?.itemContainer?.isItemSelectBorderEn).toBe(1);
     expect((page.textObject?.length ?? 0) + (page.listObject?.length ?? 0)).toBeLessThanOrEqual(8);
-    expect(allText(page)).toContain('1/2 online');
+    expect(allText(page)).toContain('1 needs you');
+  });
+
+  it('computers page lists every environment', () => {
+    const rows = computersPage(envs, '').listObject?.[0]?.itemContainer?.itemName ?? [];
+    expect(rows[0]).toContain('M4 Studio \u00b7 1 needs you, 2 running');
+    expect(rows[1]).toContain('dell-laptop \u00b7 offline');
   });
 
   it('keeps list rows within the 63-byte firmware limit', () => {

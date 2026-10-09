@@ -283,26 +283,34 @@ export function threadRow(thread: ThreadSummary, showEnv: boolean): string {
 
 const LIST_BOX = { x: PANEL.x + 10, y: BODY_Y, w: PANEL.w - 20, h: BODY_H };
 
-export function homePage(envs: EnvSummary[], inbox: ThreadSummary[] | number, connection: string): Page {
-  const online = envs.filter((env) => env.connected).length;
-  const needs = envs.reduce((sum, env) => sum + needsYou(env.attention), 0);
-  const inboxCount = typeof inbox === 'number' ? inbox : inbox.length;
-  const rows = [
-    `${needs ? MARK.approval : MARK.done} Inbox · ${needs ? `${needs} need${needs === 1 ? 's' : ''} you` : inboxCount ? `${inboxCount} active` : 'all clear'}`,
-    ...envs.map(envRow),
-  ];
-  return page(
-    chrome(
-      {
-        title: 'T3 Code',
-        meta: `${online}/${envs.length} online`,
-        status: connection,
-        hint: '[Tap open]',
-      },
-      true,
-    ),
-    [list(ID.list, LIST_BOX, rows)],
-  );
+function onlineMeta(envs: EnvSummary[]): string {
+  return `${envs.filter((env) => env.connected).length}/${envs.length} online`;
+}
+
+/** Home: every computer's threads, newest first with anything needing you on top. */
+export function homePage(threads: ThreadSummary[], envs: EnvSummary[], connection: string): Page {
+  const needs = threads.filter((t) => t.attention === 'approval' || t.attention === 'question').length;
+  const running = threads.filter((t) => t.attention === 'running').length;
+  const status = needs
+    ? `${MARK.approval} ${needs} need${needs === 1 ? 's' : ''} you`
+    : running
+      ? `${MARK.running} ${running} running`
+      : connection;
+  const rows = [...threads.slice(0, 19).map((t) => threadRow(t, true)), `\u203a Computers \u00b7 ${onlineMeta(envs)}`];
+  return page(chrome({ title: 'T3 Code', meta: `${threads.length} thread${threads.length === 1 ? '' : 's'}`, status, hint: '[Tap open]' }, true), [
+    list(ID.list, LIST_BOX, rows),
+  ]);
+}
+
+/** Number of thread rows on Home before the Computers row. */
+export function homeThreadCount(threads: ThreadSummary[]): number {
+  return Math.min(threads.length, 19);
+}
+
+export function computersPage(envs: EnvSummary[], connection: string): Page {
+  return page(chrome({ title: 'Computers', meta: onlineMeta(envs), status: connection, hint: '[Tap open \u00b7 Dbl back]' }, true), [
+    list(ID.list, LIST_BOX, envs.length ? envs.map(envRow) : ['No computers yet']),
+  ]);
 }
 
 export function threadsPage(threads: ThreadSummary[], title: string, showEnv: boolean): Page {
@@ -319,13 +327,28 @@ export function threadsPage(threads: ThreadSummary[], title: string, showEnv: bo
   );
 }
 
+/** Markdown reads as plain prose on the glasses: no markers, bullets as dots. */
+export function plainText(markdown: string): string {
+  return markdown
+    .replace(/```[\s\S]*?```/g, (block) => block.replace(/```\w*\n?/g, ''))
+    .replace(/!?\[([^\]]*)\]\([^)]*\)/g, '$1')
+    .replace(/(\*\*|__)(.+?)\1/g, '$2')
+    .replace(/(^|[^\w*])[*_]([^*_\n]+)[*_](?=[^\w*]|$)/g, '$1$2')
+    .replace(/`([^`]+)`/g, '$1')
+    .replace(/^#{1,6}\s+/gm, '')
+    .replace(/^\s*[-*+]\s+/gm, '\u2022 ')
+    .replace(/^>\s?/gm, '')
+    .replace(/\n{3,}/g, '\n\n');
+}
+
 /** Conversation as wrapped lines, oldest first; user turns start with a chevron. */
 export function conversationLines(thread: ThreadDetail): string[] {
   const lines: string[] = [];
   for (const message of thread.messages) {
     if (message.role === 'system' || !message.text.trim()) continue;
     if (lines.length) lines.push('');
-    const body = message.role === 'user' ? `› ${message.text.trim()}` : message.text.trim();
+    const text = plainText(message.text).trim();
+    const body = message.role === 'user' ? `› ${text}` : text;
     lines.push(...wrap(body, BODY_WRAP_PX));
   }
   return lines;

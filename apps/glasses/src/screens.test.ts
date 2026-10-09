@@ -29,7 +29,7 @@ function harness() {
   } as unknown as EvenAppBridge;
   const api = {
     health: vi.fn(async () => ({ ok: true, version: 'test', protocol: 1, transcription: true })),
-    envs: vi.fn(async () => []),
+    envs: vi.fn(async () => [{ id: 'm4', label: 'M4', connected: true, threadCount: 1, attention: { approval: 1, question: 0, failed: 0, running: 0 } }]),
     threads: vi.fn(async () => [detail]),
     thread: vi.fn(async () => detail),
     approval: vi.fn(async () => ({ ok: true })),
@@ -41,7 +41,8 @@ const click = (index = 0) => ({ listEvent: new List_ItemEvent({ currentSelectIte
 
 describe('state machine', () => {
   it('closes a card before leaving a thread', () => {
-    let s = transition(initialState(), { type: 'OPEN_THREADS' });
+    let s = transition(initialState(), { type: 'OPEN_COMPUTERS' });
+    s = transition(s, { type: 'OPEN_THREADS', env: 'm4' });
     s = transition(s, { type: 'OPEN_THREAD', detail });
     s = transition(s, { type: 'SHOW_CARD', card: { kind: 'notice', text: 'hi' } });
     s = transition(s, { type: 'BACK' });
@@ -58,9 +59,7 @@ describe('glasses app', () => {
   it('opens a thread and approves from the card', async () => {
     const { app, api } = harness();
     await app.start();
-    await app.handle(click(0)); // Inbox
-    expect(app.state.screen).toBe('Threads');
-    await app.handle(click(0)); // first thread
+    await app.handle(click(0)); // first thread on Home
     expect(app.state.screen).toBe('Thread');
     // A tap on the body arrives as a system event without an eventType.
     await app.handle({ sysEvent: new Sys_ItemEvent({ eventSource: 1 }) });
@@ -75,11 +74,29 @@ describe('glasses app', () => {
     const { app } = harness();
     await app.start();
     await app.handle(click(0));
-    await app.handle(click(0));
     await app.handle({ sysEvent: new Sys_ItemEvent({ eventType: OsEventTypeList.SCROLL_TOP_EVENT }) });
     expect(app.state.page).toBe(1);
     await app.handle({ sysEvent: new Sys_ItemEvent({ eventType: OsEventTypeList.DOUBLE_CLICK_EVENT }) });
+    expect(app.state.screen).toBe('Home');
+    await app.stop();
+  });
+
+  it('reaches a computer through the Computers row and returns there', async () => {
+    const { app } = harness();
+    await app.start();
+    await app.handle(click(1)); // the Computers row after one thread
+    expect(app.state.screen).toBe('Computers');
+    await app.handle(click(0)); // M4
     expect(app.state.screen).toBe('Threads');
+    await app.handle(click(0));
+    expect(app.state.screen).toBe('Thread');
+    const back = { sysEvent: new Sys_ItemEvent({ eventType: OsEventTypeList.DOUBLE_CLICK_EVENT }) };
+    await app.handle(back);
+    expect(app.state.screen).toBe('Threads');
+    await app.handle(back);
+    expect(app.state.screen).toBe('Computers');
+    await app.handle(back);
+    expect(app.state.screen).toBe('Home');
     await app.stop();
   });
 });

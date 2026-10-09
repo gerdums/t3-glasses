@@ -1,17 +1,24 @@
 import type { EnvSummary, ThreadDetail, ThreadSummary } from '@t3-glasses/protocol';
 import type { ActionItem, Card } from './render';
 
-/** Three places to be; actions, voice, and notices are cards over a thread. */
-export type Screen = 'Home' | 'Threads' | 'Thread';
+/**
+ * Home lists every thread, like the phone app; Computers and per-computer
+ * Threads sit one level down. Actions, voice, and notices are cards over a thread.
+ */
+export type Screen = 'Home' | 'Computers' | 'Threads' | 'Thread';
 
 export interface State {
   screen: Screen;
   foreground: boolean;
   envs: EnvSummary[];
+  /** Every computer's threads, shown on Home. */
   inbox: ThreadSummary[];
+  /** One computer's threads, shown on Threads. */
   threads: ThreadSummary[];
   envFilter?: string;
   detail?: ThreadDetail;
+  /** The list a thread was opened from, for Back. */
+  returnTo: 'Home' | 'Threads';
   /** Conversation page; 0 is the newest. */
   page: number;
   card?: Card;
@@ -21,7 +28,8 @@ export interface State {
 
 export type Intent =
   | { type: 'OPEN_HOME' }
-  | { type: 'OPEN_THREADS'; env?: string }
+  | { type: 'OPEN_COMPUTERS' }
+  | { type: 'OPEN_THREADS'; env: string }
   | { type: 'OPEN_THREAD'; detail: ThreadDetail }
   | { type: 'BACK' }
   | { type: 'PAGE'; delta: number }
@@ -29,7 +37,8 @@ export type Intent =
   | { type: 'CLOSE_CARD' }
   | { type: 'VOICE_TARGET'; target: 'reply' | 'answer' }
   | { type: 'FOREGROUND'; foreground: boolean }
-  | { type: 'ENVS'; envs: EnvSummary[]; inbox: ThreadSummary[] }
+  | { type: 'ENVS'; envs: EnvSummary[] }
+  | { type: 'INBOX'; inbox: ThreadSummary[] }
   | { type: 'THREADS'; threads: ThreadSummary[] }
   | { type: 'DETAIL'; detail: ThreadDetail }
   | { type: 'CONNECTION'; text: string };
@@ -41,6 +50,7 @@ export const initialState = (): State => ({
   inbox: [],
   threads: [],
   page: 0,
+  returnTo: 'Home',
   voiceTarget: 'reply',
   connection: '· Connecting…',
 });
@@ -49,13 +59,23 @@ export function transition(state: State, intent: Intent): State {
   switch (intent.type) {
     case 'OPEN_HOME':
       return { ...state, screen: 'Home', envFilter: undefined, card: undefined };
+    case 'OPEN_COMPUTERS':
+      return { ...state, screen: 'Computers', envFilter: undefined, card: undefined };
     case 'OPEN_THREADS':
       return { ...state, screen: 'Threads', envFilter: intent.env, threads: [], card: undefined };
     case 'OPEN_THREAD':
-      return { ...state, screen: 'Thread', detail: intent.detail, page: 0, card: undefined };
+      return {
+        ...state,
+        screen: 'Thread',
+        detail: intent.detail,
+        page: 0,
+        card: undefined,
+        returnTo: state.screen === 'Threads' ? 'Threads' : 'Home',
+      };
     case 'BACK':
       if (state.card) return { ...state, card: undefined };
-      if (state.screen === 'Thread') return { ...state, screen: 'Threads', page: 0 };
+      if (state.screen === 'Thread') return { ...state, screen: state.returnTo, page: 0 };
+      if (state.screen === 'Threads') return { ...state, screen: 'Computers', envFilter: undefined };
       return { ...state, screen: 'Home', envFilter: undefined };
     case 'PAGE':
       return { ...state, page: Math.max(0, state.page + intent.delta) };
@@ -68,7 +88,9 @@ export function transition(state: State, intent: Intent): State {
     case 'FOREGROUND':
       return { ...state, foreground: intent.foreground };
     case 'ENVS':
-      return { ...state, envs: intent.envs, inbox: intent.inbox };
+      return { ...state, envs: intent.envs };
+    case 'INBOX':
+      return { ...state, inbox: intent.inbox };
     case 'THREADS':
       return { ...state, threads: intent.threads };
     case 'DETAIL':
