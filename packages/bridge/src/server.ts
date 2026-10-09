@@ -1,6 +1,9 @@
 /** HTTP API for the glasses app; see packages/protocol for the contract. */
 import { timingSafeEqual } from "node:crypto";
+import { readFile } from "node:fs/promises";
 import { createServer, type IncomingMessage, type Server, type ServerResponse } from "node:http";
+import { extname, join, normalize } from "node:path";
+import { fileURLToPath } from "node:url";
 import {
   PROTOCOL_VERSION,
   type AnswerRequest,
@@ -18,6 +21,34 @@ export const VERSION = "0.1.0";
 const MAX_JSON_BYTES = 64 * 1024;
 const MAX_AUDIO_BYTES = 16_000 * 2 * 180; // three minutes of 16 kHz s16le mono
 const DECISIONS = new Set<ApprovalDecision>(["accept", "acceptForSession", "acceptAlways", "decline", "cancel"]);
+
+/** The glasses web app, bundled into dist/app at build time. */
+const APP_DIR = fileURLToPath(new URL("./app/", import.meta.url));
+const CONTENT_TYPES: Record<string, string> = {
+  ".html": "text/html; charset=utf-8",
+  ".js": "text/javascript; charset=utf-8",
+  ".css": "text/css; charset=utf-8",
+  ".json": "application/json",
+  ".svg": "image/svg+xml",
+  ".png": "image/png",
+  ".ico": "image/x-icon",
+};
+
+async function serveApp(pathname: string, response: ServerResponse): Promise<boolean> {
+  const relative = normalize(decodeURIComponent(pathname)).replace(/^([/\\])+/, "") || "index.html";
+  if (relative.startsWith("..")) return false;
+  try {
+    const body = await readFile(join(APP_DIR, relative));
+    response.writeHead(200, {
+      "content-type": CONTENT_TYPES[extname(relative)] ?? "application/octet-stream",
+      "cache-control": relative === "index.html" ? "no-store" : "public, max-age=3600",
+    });
+    response.end(body);
+    return true;
+  } catch {
+    return false;
+  }
+}
 
 class HttpError extends Error {
   constructor(
@@ -94,9 +125,13 @@ export function createBridgeServer(hub: Hub, config: () => BridgeConfig, pairGla
 
     const url = new URL(request.url ?? "/", "http://bridge");
     try {
-      if (url.pathname === "/" && request.method === "GET") {
-        response.writeHead(200, { "content-type": "text/plain" }).end("t3-glasses bridge\n");
-        return;
+      // The glasses app itself, so the Even app can load it straight from the bridge.
+      if (request.method === "GET" && !url.pathname.startsWith("/api/")) {
+        if (await serveApp(url.pathname, response)) return;
+        if (url.pathname === "/") {
+          response.writeHead(200, { "content-type": "text/plain" }).end("t3-glasses bridge\n");
+          return;
+        }
       }
 
       // The only unauthenticated API: trade a short-lived pairing code for the glasses token.

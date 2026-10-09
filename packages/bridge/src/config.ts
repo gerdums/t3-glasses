@@ -33,7 +33,9 @@ export type TranscriptionConfig =
    * 16 kHz mono WAV file; the command prints the transcript on stdout.
    * Example: ["whisper-cli", "-m", "/models/ggml-base.en.bin", "-nt", "-np", "-f", "{wav}"]
    */
-  | { provider: "command"; command: string[] };
+  | { provider: "command"; command: string[] }
+  /** whisper.cpp's whisper-server, kept warm by a login agent. */
+  | { provider: "whisper-server"; url: string };
 
 /** T3 account sign-in: discovers every environment linked through T3 Connect. */
 export interface AccountConfig {
@@ -58,6 +60,8 @@ export interface GlassesPairing {
 export interface BridgeConfig {
   version: 1;
   glassesPairing?: GlassesPairing;
+  /** Public HTTPS address of this bridge (set by `t3-glasses expose`). */
+  bridgeUrl?: string;
   account?: AccountConfig;
   /** Token the glasses app presents to the bridge. Secret. */
   glassesToken: string;

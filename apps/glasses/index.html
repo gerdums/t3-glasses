@@ -35,11 +35,24 @@
       #status.ok { color: var(--accent); }
       #status.error { color: #ff8a80; }
       .caption { color: var(--text-dim); font-size: 13px; line-height: 1.4; }
+      #connected { display: none; }
+      body.paired #pair, body.paired .caption { display: none; }
+      body.paired #connected { display: block; }
+      .row { display: flex; align-items: center; gap: 10px; font-size: 16px; }
+      .dot { width: 10px; height: 10px; border-radius: 50%; background: var(--accent); flex: none; }
+      .host { color: var(--text-dim); font-size: 13px; margin: 8px 0 16px; word-break: break-all; }
+      .secondary { background: var(--input); color: var(--text); font-weight: 500; }
     </style>
   </head>
   <body>
     <h1>T3 Glasses</h1>
     <p class="lede">Your T3 Code threads on your glasses.</p>
+
+    <section id="connected" class="card">
+      <div class="row"><span class="dot"></span>Connected. Your threads are on your glasses.</div>
+      <p class="host" id="connected-host"></p>
+      <button id="repair" class="secondary" type="button">Pair again</button>
+    </section>
 
     <form id="pair" class="card" autocomplete="off">
       <div class="field">
@@ -60,7 +73,7 @@
     </form>
 
     <p class="caption">
-      Run <code>t3-glasses glasses-code</code> on the computer running the bridge to get a code. It's valid for 10 minutes.
+      On the computer running the bridge, run <code>t3-glasses glasses-code</code>. It shows a QR code to scan and a code you can type here, valid for 10 minutes.
     </p>
     <script type="module" src="/src/main.ts"></script>
   </body>

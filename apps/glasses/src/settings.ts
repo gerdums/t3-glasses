@@ -7,11 +7,25 @@ export interface Settings {
 
 const KEY = 't3-glasses-settings';
 
-/** Build-time defaults; the bridge address is not secret, so private builds can bake it in. */
+/** Served by the bridge itself (the QR install): the page's own origin is the bridge. */
+function servedByBridge(): string {
+  if (typeof location === 'undefined' || location.protocol !== 'https:') return '';
+  return location.origin;
+}
+
+/** Build-time values win (private builds bake in the address); otherwise use the serving bridge. */
 export const defaults: Settings = {
-  url: import.meta.env.VITE_BRIDGE_URL || '',
+  url: import.meta.env.VITE_BRIDGE_URL || servedByBridge(),
   token: import.meta.env.VITE_BRIDGE_TOKEN || '',
 };
+
+/** A pairing code passed in the QR link (`#code=123456`), removed from the address once read. */
+export function takeCodeFromUrl(): string {
+  if (typeof location === 'undefined') return '';
+  const code = new URLSearchParams(location.hash.slice(1)).get('code')?.replace(/\D/g, '') ?? '';
+  if (code) history.replaceState(null, '', location.pathname + location.search);
+  return code.length === 6 ? code : '';
+}
 
 export async function loadSettings(bridge: Pick<EvenAppBridge, 'getLocalStorage'>): Promise<Settings> {
   try {

@@ -29,6 +29,7 @@ export function pcmToWav(pcm: Buffer, sampleRate = SAMPLE_RATE): Buffer {
 
 export function transcriptionAvailable(config: TranscriptionConfig): boolean {
   if (config.provider === "openai") return Boolean(process.env[config.apiKeyEnv ?? "OPENAI_API_KEY"]);
+  if (config.provider === "whisper-server") return Boolean(config.url);
   return config.provider === "command" && config.command.length > 0;
 }
 
@@ -50,6 +51,20 @@ export async function transcribe(pcm: Buffer, config: TranscriptionConfig): Prom
       });
       if (!response.ok) throw new Error(`Transcription failed (HTTP ${response.status})`);
       return ((await response.json()) as { text: string }).text.trim();
+    }
+    case "whisper-server": {
+      const form = new FormData();
+      form.set("file", new Blob([new Uint8Array(wav)], { type: "audio/wav" }), "speech.wav");
+      form.set("response_format", "json");
+      const response = await fetch(`${config.url.replace(/\/$/, "")}/inference`, {
+        method: "POST",
+        body: form,
+        signal: AbortSignal.timeout(60_000),
+      }).catch(() => {
+        throw new Error("Voice transcription is not running. Run `t3-glasses setup` to install it.");
+      });
+      if (!response.ok) throw new Error(`Transcription failed (HTTP ${response.status})`);
+      return ((await response.json()) as { text: string }).text.replace(/\s+/g, " ").trim();
     }
     case "command": {
       const dir = await mkdtemp(join(tmpdir(), "t3-glasses-"));
