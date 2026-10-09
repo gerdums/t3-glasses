@@ -2,7 +2,8 @@
  * macOS login agents: the bridge, and optionally whisper-server for fast
  * local voice transcription. Both start at login and restart if they exit.
  */
-import { execFile } from "node:child_process";
+import { execFile, execFileSync } from "node:child_process";
+import { existsSync } from "node:fs";
 import { access, mkdir, rm, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
@@ -109,12 +110,29 @@ export async function agentStatus(label: string): Promise<string> {
   }
 }
 
+/**
+ * The Node the login agent runs with. Prefer Homebrew's, which the installer
+ * manages, over whichever node happened to be first on PATH during setup.
+ */
+function stableNode(): string {
+  for (const candidate of ["/opt/homebrew/bin/node", "/usr/local/bin/node"]) {
+    if (!existsSync(candidate)) continue;
+    try {
+      const version = execFileSync(candidate, ["-p", "process.versions.node"], { encoding: "utf8" });
+      if (Number(version.split(".")[0]) >= 22) return candidate;
+    } catch {
+      // Not runnable; try the next one.
+    }
+  }
+  return process.execPath;
+}
+
 export function bridgeAgent(cliPath: string): AgentSpec {
   const env: Record<string, string> = { PATH: process.env.PATH ?? "/usr/bin:/bin" };
   for (const key of ["T3_GLASSES_CONFIG", "OPENAI_API_KEY"]) {
     if (process.env[key]) env[key] = process.env[key]!;
   }
-  return { label: BRIDGE_LABEL, program: [process.execPath, cliPath, "serve"], env, log: serviceLogPath() };
+  return { label: BRIDGE_LABEL, program: [stableNode(), cliPath, "serve"], env, log: serviceLogPath() };
 }
 
 export function whisperAgent(binary: string, model: string): AgentSpec {
