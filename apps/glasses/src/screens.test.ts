@@ -57,6 +57,38 @@ describe('state machine', () => {
   });
 });
 
+describe('live updates', () => {
+  it('refreshes when the bridge pushes a change, without any input', async () => {
+    vi.useFakeTimers();
+    const { bridge, api } = harness();
+    let push: (() => void) | undefined;
+    (api as { events?: unknown }).events = vi.fn((listener: () => void) => {
+      push = listener;
+      return () => {};
+    });
+    const app = new GlassesApp(bridge, api);
+    await app.start();
+    const before = (api.home as ReturnType<typeof vi.fn>).mock.calls.length;
+    push!();
+    await vi.advanceTimersByTimeAsync(300);
+    expect((api.home as ReturnType<typeof vi.fn>).mock.calls.length).toBe(before + 1);
+    await app.stop();
+    vi.useRealTimers();
+  });
+
+  it('resumes updating on input after the glasses leave the foreground', async () => {
+    const { app, api } = harness();
+    await app.start();
+    await app.handle({ sysEvent: new Sys_ItemEvent({ eventType: OsEventTypeList.FOREGROUND_EXIT_EVENT }) });
+    expect(app.state.foreground).toBe(false);
+    const before = (api.home as ReturnType<typeof vi.fn>).mock.calls.length;
+    await app.handle({ listEvent: new List_ItemEvent({ eventType: OsEventTypeList.SCROLL_BOTTOM_EVENT, currentSelectItemIndex: 1 }) });
+    expect(app.state.foreground).toBe(true);
+    expect((api.home as ReturnType<typeof vi.fn>).mock.calls.length).toBeGreaterThan(before);
+    await app.stop();
+  });
+});
+
 describe('glasses app', () => {
   it('opens a shelf like T3 Code and returns to Home', async () => {
     const { app, api } = harness();

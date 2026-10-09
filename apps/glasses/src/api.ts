@@ -11,7 +11,8 @@ export interface BridgeApi {
   answer(env: string, thread: string, body: AnswerRequest): Promise<OkResponse>;
   interrupt(env: string, thread: string): Promise<OkResponse>;
   transcribe(pcm: Uint8Array): Promise<TranscribeResponse>;
-  events(onEvent: (event: BridgeEvent) => void): () => void;
+  /** Live change events from the bridge; optional so test doubles can omit it. */
+  events?(onEvent: (event: BridgeEvent) => void): () => void;
 }
 
 export class HttpBridgeApi implements BridgeApi {
@@ -61,6 +62,7 @@ export class HttpBridgeApi implements BridgeApi {
   events(onEvent: (event: BridgeEvent) => void): () => void {
     const url = new URL(ROUTES.events, this.baseUrl);
     url.searchParams.set('token', this.token);
+    if (typeof EventSource === 'undefined') return () => {};
     const source = new EventSource(url);
     for (const type of ['envs', 'thread'] as const) source.addEventListener(type, (raw) => { try { onEvent(JSON.parse((raw as MessageEvent).data) as BridgeEvent); } catch { /* malformed event */ } });
     return () => source.close();

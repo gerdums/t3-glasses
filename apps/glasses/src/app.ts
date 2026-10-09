@@ -26,6 +26,8 @@ import { initialState, transition, type Intent, type State } from './screens';
 import { VoiceCapture } from './voice';
 
 const POLL_MS = 3000;
+/** Coalesces bursts of bridge change events into one refresh. */
+const PUSH_DEBOUNCE_MS = 250;
 const NOTICE_MS = 1600;
 
 // Protobuf omits zero values, so a click (CLICK_EVENT = 0) arrives with no eventType at all.
@@ -80,7 +82,9 @@ export class GlassesApp {
   private noticeTimer?: ReturnType<typeof setTimeout>;
   private unsubscribe?: () => void;
   private queue: Promise<void> = Promise.resolve();
-  private generation = 0;
+  private refreshing = false;
+  private pushTimer?: ReturnType<typeof setTimeout>;
+  private unsubscribeEvents?: () => void;
 
   constructor(
     private readonly bridge: EvenAppBridge,
@@ -98,8 +102,17 @@ export class GlassesApp {
       this.queue = this.queue.then(() => this.handle(event)).catch((error) => this.showError(error));
     });
     await this.display();
+    // The bridge pushes an event whenever any thread or computer changes; refresh right away.
+    this.unsubscribeEvents = this.api.events?.(() => {
+      if (this.pushTimer) clearTimeout(this.pushTimer);
+      this.pushTimer = setTimeout(() => {
+        this.pushTimer = undefined;
+        void this.refresh();
+      }, PUSH_DEBOUNCE_MS);
+    });
+    // Polling is the fallback for a dropped event stream. Skip a tick while a refresh is still loading.
     this.timer = setInterval(() => {
-      if (this.state.foreground) void this.refresh();
+      if (this.state.foreground && !this.refreshing) void this.refresh();
     }, POLL_MS);
     await this.refresh();
   }
@@ -107,7 +120,9 @@ export class GlassesApp {
   async stop() {
     if (this.timer) clearInterval(this.timer);
     if (this.noticeTimer) clearTimeout(this.noticeTimer);
+    if (this.pushTimer) clearTimeout(this.pushTimer);
     this.unsubscribe?.();
+    this.unsubscribeEvents?.();
     await this.voice.cancel();
   }
 
@@ -188,11 +203,17 @@ export class GlassesApp {
 
   // ---- Data -------------------------------------------------------------------
 
+  /** Identifies what's on screen, so a refresh that finishes after the user moves on is dropped. */
+  private viewKey(): string {
+    const s = this.state;
+    return [s.screen, s.envFilter ?? '', s.section ?? '', s.detail?.envId ?? '', s.detail?.id ?? ''].join('|');
+  }
+
   async refresh() {
-    if (!this.state.foreground) return;
-    const generation = ++this.generation;
     const screen = this.state.screen;
-    const stale = () => generation !== this.generation || this.state.screen !== screen;
+    const view = this.viewKey();
+    const stale = () => this.viewKey() !== view;
+    this.refreshing = true;
     try {
       if (screen === 'Home' || screen === 'Computers') {
         const [envs, home] = await Promise.all([this.api.envs(), screen === 'Home' ? this.api.home(undefined, 20) : undefined]);
@@ -225,6 +246,8 @@ export class GlassesApp {
       if (stale()) return;
       this.dispatch({ type: 'CONNECTION', text: `× ${messageOf(error)}` });
       if (screen === 'Home' || screen === 'Computers') await this.display();
+       } finally {
+      this.refreshing = false;
     }
   }
 
@@ -325,9 +348,14 @@ export class GlassesApp {
     const s = this.state;
     const type = eventType(event);
 
+    // Any input means the user is looking at the app, even if no foreground event arrived.
+    if (!s.foreground && type !== OsEventTypeList.FOREGROUND_EXIT_EVENT && type !== undefined) {
+      this.dispatch({ type: 'FOREGROUND', foreground: true });
+      if (type !== OsEventTypeList.FOREGROUND_ENTER_EVENT) void this.refresh();
+    }
+
     if (type === OsEventTypeList.FOREGROUND_EXIT_EVENT) {
       this.dispatch({ type: 'FOREGROUND', foreground: false });
-      this.generation += 1;
       if (s.card?.kind === 'listening') {
         await this.voice.cancel();
         this.dispatch({ type: 'CLOSE_CARD' });
