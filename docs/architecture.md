@@ -24,18 +24,24 @@ on a 576×288 display, and turns microphone PCM into text.
 
 ## Reaching your environments
 
-T3 Code's mobile app lists environments through T3 Connect with a first-party
-sign-in that third-party clients cannot use. The bridge instead pairs once with
-each environment, the same way any other T3 client does:
+The bridge signs in to your T3 account once and sees the same environments as
+the T3 phone app:
 
-1. In T3 Code, open **Settings → Connections** for the environment and create a
-   pairing link (or run `t3 auth pairing create` on that host).
-2. Run `t3-glasses pair '<pairing link>'` on the bridge computer.
-3. The bridge exchanges the one-time pairing token at `<env>/oauth/token` for a
-   30-day bearer session scoped to `orchestration:read orchestration:operate`.
+1. `t3-glasses setup` signs in through Clerk's Frontend API in native mode
+   (email code) and keeps its own Clerk client, separate from your devices.
+2. For each request it mints a Clerk session JWT from the `t3-relay` template
+   and lists environments at `GET https://relay.t3.codes/v1/environments`.
+3. It exchanges the JWT for a DPoP-bound relay token
+   (`POST /v1/client/dpop-token`, `client_id=t3-web`, 30 min), asks the relay
+   for a single-use bootstrap credential per environment
+   (`POST /v1/environments/:id/connect`), and trades that at the environment's
+   `/oauth/token` for a 1 h DPoP session scoped to
+   `orchestration:read orchestration:operate`.
+4. Every environment request carries `Authorization: DPoP <token>` and a fresh
+   ES256 proof (`htm`, `htu`, `ath`). Sessions renew by repeating the chain.
 
-The session works over whatever address the link uses: `localhost`, LAN,
-Tailscale, or the environment's T3 Connect hostname. Re-pair before it expires.
+Machines not linked through T3 Connect can still be paired directly with a
+pairing link (`t3-glasses pair`), which yields a 30-day bearer session.
 
 ## T3 protocol notes
 
@@ -60,8 +66,9 @@ Verified against T3 Code server 0.0.46 (orchestration protocol 2).
 
 ## Security
 
-- T3 session tokens and the glasses token live in the bridge config file with
-  mode 0600. They never reach the glasses app beyond the glasses token.
+- The T3 sign-in, DPoP key, session tokens, and glasses token live in the
+  bridge config file with mode 0600. Only the glasses token reaches the phone,
+  delivered by a single-use 6-digit pairing code.
 - Only expose the bridge over HTTPS on a private network such as your tailnet.
 - The bridge holds `orchestration:operate` on each paired environment: anyone
   with the glasses token can message threads and answer approvals. Rotate it

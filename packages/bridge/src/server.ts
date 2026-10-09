@@ -60,7 +60,9 @@ function send(response: ServerResponse, status: number, body: unknown): void {
   response.end(JSON.stringify(body));
 }
 
-export function createBridgeServer(hub: Hub, config: () => BridgeConfig): Server {
+export type PairGlasses = (code: string) => Promise<{ token: string } | { error: string }>;
+
+export function createBridgeServer(hub: Hub, config: () => BridgeConfig, pairGlasses?: PairGlasses): Server {
   const sseClients = new Set<ServerResponse>();
 
   const broadcast = (event: BridgeEvent) => {
@@ -94,6 +96,15 @@ export function createBridgeServer(hub: Hub, config: () => BridgeConfig): Server
     try {
       if (url.pathname === "/" && request.method === "GET") {
         response.writeHead(200, { "content-type": "text/plain" }).end("t3-glasses bridge\n");
+        return;
+      }
+
+      // The only unauthenticated API: trade a short-lived pairing code for the glasses token.
+      if (url.pathname === "/api/pair" && request.method === "POST") {
+        const body = await readJson<{ code?: string }>(request);
+        const result = pairGlasses ? await pairGlasses(String(body.code ?? "")) : { error: "Pairing is not available" };
+        if ("error" in result) throw new HttpError(403, result.error);
+        send(response, 200, { ok: true, token: result.token });
         return;
       }
 

@@ -47,14 +47,14 @@ const approval: ThreadDetail = {
 
 const envs: EnvSummary[] = [
   { id: 'm4', label: 'M4 Studio', connected: true, threadCount: 3, attention: { approval: 1, question: 0, failed: 0, running: 2 } },
-  { id: 'dell', label: 'dell-laptop', connected: false, threadCount: 0, attention: { approval: 0, question: 0, failed: 0, running: 0 } },
+  { id: 'work', label: 'work-laptop', connected: false, threadCount: 0, attention: { approval: 0, question: 0, failed: 0, running: 0 } },
 ];
 
 const allText = (page: ReturnType<typeof homePage>) => (page.textObject ?? []).map((t) => t.content).join('\n');
 
 describe('text', () => {
   it('keeps glyphs the firmware draws and maps the rest', () => {
-    expect(sanitize('Gareth’s “Mac” — ok ✓ ⚠')).toBe('Gareth’s “Mac” — ok • !');
+    expect(sanitize('Sam’s “Mac” — ok ✓ ⚠')).toBe('Sam’s “Mac” — ok • !');
   });
   it('wraps within the pixel budget', () => {
     for (const line of wrap('The quick brown fox jumps over the lazy dog. '.repeat(10), BODY_WRAP_PX)) {
@@ -98,7 +98,7 @@ describe('screens', () => {
   it('computers page lists every environment', () => {
     const rows = computersPage(envs, '').listObject?.[0]?.itemContainer?.itemName ?? [];
     expect(rows[0]).toContain('M4 Studio \u00b7 1 needs you, 2 running');
-    expect(rows[1]).toContain('dell-laptop \u00b7 offline');
+    expect(rows[1]).toContain('work-laptop \u00b7 offline');
   });
 
   it('keeps list rows within the 63-byte firmware limit', () => {

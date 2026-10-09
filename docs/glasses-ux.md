@@ -1,60 +1,64 @@
 # Glasses UX
 
-Display: 576×288, monochrome green, one firmware font (not monospaced,
-unsupported glyphs are dropped, so stick to ASCII). Input: ring or either
-temple: click, double-click, scroll up/down, long-press/release.
+The design follows Even Terminal, Even's own agent view for the G2: one rounded
+panel, a title row, hairline dividers, and a footer with status on the left and
+a dim bracketed hint on the right. Choices appear in an inset card with the
+firmware's native list selection box.
 
-Global conventions
-
-- Scroll moves the list highlight or scrolls text.
-- Click selects or opens the action menu.
-- Double-click goes back one screen. On Home it does nothing.
-- Long-press anywhere in a thread starts voice capture; release stops it.
-
-Attention markers (ASCII, prefixed to list rows)
-
-| Marker | Meaning |
-|---|---|
-| `[!]` | approval waiting |
-| `[?]` | question waiting |
-| `[x]` | failed |
-| `[>]` | running |
-| `[.]` | done, unsettled |
-| (none) | idle |
+```
+╭──────────────────────────────────────────────╮
+│ Fix the flaky login test          M4 Studio  │  title · meta (dim)
+│ ──────────────────────────────────────────── │
+│ › Please fix the flaky login test.           │  conversation, newest
+│ Looking at it now...                         │  page visible first
+│ ──────────────────────────────────────────── │
+│ ◆ Needs approval              [Tap respond]  │  status · hint (dim)
+╰──────────────────────────────────────────────╯
+```
 
 ## Screens
 
-1. **Home**: list. First row `Inbox (N)` = all environments' threads that need
-   attention. Then one row per environment: `[!2 ?1 >3] M4 Studio` or
-   `(offline) M1 Worker`. A one-line status text at the bottom shows bridge
-   connection state.
-2. **Threads**: list of up to 20 threads, attention-sorted:
-   `[!] project: title`. Click opens the thread.
-3. **Thread**: top text container (event-capturing, scrollable) shows the
-   latest messages, newest at the bottom, as `> user text` and plain assistant
-   text, plus the current activity line while running. A bottom status line
-   shows `status · env`. Click opens the action menu.
-4. **Action menu** (context menu, max 10 items, 32 bytes each), contents depend
-   on state:
-   - pending approval: `Approve`, `Approve for session`, `Deny` (only the
-     options the request advertises), then `Show request`
-   - pending question: one item per option label of the first question
-     (truncated), plus `Dictate answer`
-   - always: `Reply by voice`, `Interrupt` (when running), `Refresh`, `Back`
-5. **Voice**: while recording show `Listening... release to stop`. After
-   transcription show the text with `Click: send  Double: cancel`.
-6. **Confirm**: after an action show `Sent` / `Approved` / error text briefly,
-   then return to the thread.
+1. **Home**: every computer's threads, attention first (approvals and
+   questions, then running, failed, finished, idle), then a final
+   `› Computers` row. Title meta shows the thread count.
+2. **Computers**: one row per machine with its counts, or `offline`.
+3. **Threads**: one computer's threads.
+4. **Thread**: the conversation as prose (Markdown stripped), user turns
+   marked `›`. Scrolling past either end pages through older history; the
+   footer shows the live activity line while the agent works.
+5. **Cards** over a thread:
+   - actions: an approval's prompt and its provider options, a question and
+     its choices plus `Speak an answer`, then `Reply by voice`, `Interrupt`
+     (while running), `Back`
+   - voice: `Listening… release to stop`, then the quoted transcript with
+     `Send` / `Cancel`
+   - notice: `• Approved`, `• Sent`, or an error, for 1.6 s
+
+## Input
+
+| Gesture | Lists | Thread | Card |
+|---|---|---|---|
+| Scroll | move selection | page history | move selection |
+| Tap | open | open actions | choose |
+| Double-tap | back | back to list | close card |
+| Hold / release | | record / transcribe | |
+
+The same actions are also registered as the native context menu.
+
+## Vocabulary
+
+`◆` needs you · `»` running · `×` failed · `•` finished · `·` idle · `›` user
+turn or drill-in. Only glyphs present in the firmware font are used
+(`@evenrealities/pretext` reports zero width for missing ones).
 
 ## Refresh
 
-Poll the current screen every 3 s while in foreground (or use `/api/events`).
-Use `textContainerUpgrade` for in-place text changes; rebuild the page only
-when the layout changes. Pause polling on `FOREGROUND_EXIT_EVENT`.
+The app polls the current screen every 3 s in the foreground and pauses on
+`FOREGROUND_EXIT`. When only text changed it uses `textContainerUpgrade`, so
+updates don't flicker; layout changes rebuild the page.
 
-## Phone-side settings
+## Phone page
 
-The WebView page itself (visible in the Even app on the phone) shows a small
-settings form: bridge URL and glasses token, saved with
-`bridge.setLocalStorage`. Build-time defaults come from `VITE_BRIDGE_URL` and
-`VITE_BRIDGE_TOKEN`.
+The WebView page on the phone uses the Even app's dark design tokens: bridge
+address (baked into private builds) and a 6-digit pairing code. The raw glasses
+token sits under Advanced.

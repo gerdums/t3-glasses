@@ -13,6 +13,7 @@ import {
   computersPage,
   homePage,
   homeThreadCount,
+  messagePage,
   threadPage,
   threadsPage,
   type Action,
@@ -40,10 +41,38 @@ function itemsOf(card: Card | undefined): ActionItem[] {
   return [];
 }
 
+let pageCreated = false;
+
+/** Creates the startup page once per launch, rebuilding if one already exists. */
+async function showPage(bridge: EvenAppBridge, next: Page): Promise<void> {
+  if (pageCreated) {
+    if (!(await bridge.rebuildPageContainer(next))) throw new Error('Glasses page rebuild failed');
+    return;
+  }
+  const result = await bridge.createStartUpPageContainer(next);
+  // `invalid` also means a page already exists, e.g. after the WebView reloads.
+  if (result === StartUpPageCreateResult.invalid) {
+    if (!(await bridge.rebuildPageContainer(next))) throw new Error('Glasses page rebuild failed');
+  } else if (result !== StartUpPageCreateResult.success) {
+    throw new Error(`Glasses page failed: ${result}`);
+  }
+  pageCreated = true;
+}
+
+/** Shown on the glasses until the phone page has paired with a bridge. */
+export async function showSetupScreen(bridge: EvenAppBridge): Promise<void> {
+  await showPage(
+    bridge,
+    messagePage(
+      'T3 Code',
+      'Open T3 Glasses in the Even app on your phone and enter the pairing code.\n\nGet a code on your computer with: t3-glasses glasses-code',
+      '\u00b7 Not paired',
+    ),
+  );
+}
+
 export class GlassesApp {
   state: State = initialState();
-  /** The SDK allows one startup page per launch; later instances rebuild. */
-  private static pageCreated = false;
   private readonly voice: VoiceCapture;
   private lastPage?: Page;
   private timer?: ReturnType<typeof setInterval>;
@@ -98,15 +127,8 @@ export class GlassesApp {
 
   private async display() {
     const next = this.render();
-    if (!GlassesApp.pageCreated) {
-      const result = await this.bridge.createStartUpPageContainer(next);
-      // `invalid` also means a page already exists, e.g. after the WebView reloads: rebuild it instead.
-      if (result === StartUpPageCreateResult.invalid) {
-        if (!(await this.bridge.rebuildPageContainer(next))) throw new Error('Glasses page rebuild failed');
-      } else if (result !== StartUpPageCreateResult.success) {
-        throw new Error(`Glasses page failed: ${result}`);
-      }
-      GlassesApp.pageCreated = true;
+    if (!this.lastPage) {
+      await showPage(this.bridge, next);
       this.lastPage = next;
       return;
     }

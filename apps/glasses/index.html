@@ -1,4 +1,67 @@
 <!doctype html>
-<html lang="en"><head><meta charset="UTF-8"><meta name="viewport" content="width=device-width, initial-scale=1"><title>T3 Glasses</title>
-<style>body{font:16px system-ui,sans-serif;max-width:480px;margin:2rem auto;padding:0 1rem;background:#101b13;color:#dcebdc}label{display:block;margin:1rem 0}input{box-sizing:border-box;width:100%;padding:.65rem;background:#fff;color:#111;border:0;border-radius:4px}button{padding:.7rem 1rem;background:#96d59f;border:0;border-radius:4px}small{color:#bacaba}#status{min-height:1.5em}</style></head>
-<body><h1>T3 Glasses</h1><p>Bridge settings for the glasses app.</p><form id="settings"><label>Bridge URL<input id="bridge-url" type="url" required placeholder="https://your-bridge.example.ts.net"></label><label>Glasses token<input id="bridge-token" type="password" autocomplete="off"></label><button type="submit">Save settings</button></form><p id="status" role="status"></p><small>The package network whitelist must contain the bridge origin.</small><script type="module" src="/src/main.ts"></script></body></html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover" />
+    <title>T3 Glasses</title>
+    <style>
+      /* Even app phone design tokens (dark). Glasses green never appears here. */
+      :root {
+        --text: #ffffff;
+        --text-dim: #8a8a8a;
+        --bg: #111111;
+        --surface: #1a1a1a;
+        --input: rgba(255, 255, 255, 0.08);
+        --accent: #fef991;
+        font-family: 'FK Grotesk Neue', system-ui, -apple-system, sans-serif;
+        letter-spacing: -0.01em;
+        color: var(--text);
+        background: var(--bg);
+      }
+      body { margin: 0; padding: 24px 20px 48px; max-width: 520px; margin-inline: auto; }
+      h1 { font-size: 24px; font-weight: 600; letter-spacing: -0.02em; margin: 8px 0 4px; }
+      .lede { color: var(--text-dim); font-size: 16px; margin: 0 0 24px; }
+      .card { background: var(--surface); border-radius: 16px; padding: 16px; margin-bottom: 16px; }
+      .label { display: block; font-size: 11px; font-weight: 500; letter-spacing: 0.04em; text-transform: uppercase; color: var(--text-dim); margin: 0 0 8px; }
+      input { box-sizing: border-box; width: 100%; padding: 12px 14px; border: 0; border-radius: 10px; background: var(--input); color: var(--text); font: inherit; font-size: 16px; }
+      input:focus { outline: 1px solid var(--accent); }
+      #code { font-size: 28px; letter-spacing: 0.3em; text-align: center; font-variant-numeric: tabular-nums; }
+      .field + .field { margin-top: 16px; }
+      button { width: 100%; padding: 14px; border: 0; border-radius: 12px; background: var(--accent); color: #111; font: inherit; font-size: 16px; font-weight: 600; }
+      button:disabled { opacity: 0.5; }
+      details { color: var(--text-dim); font-size: 13px; margin-top: 8px; }
+      summary { cursor: pointer; padding: 8px 0; }
+      #status { min-height: 1.4em; font-size: 15px; margin: 16px 0 0; }
+      #status.ok { color: var(--accent); }
+      #status.error { color: #ff8a80; }
+      .caption { color: var(--text-dim); font-size: 13px; line-height: 1.4; }
+    </style>
+  </head>
+  <body>
+    <h1>T3 Glasses</h1>
+    <p class="lede">Your T3 Code threads on your glasses.</p>
+
+    <form id="pair" class="card" autocomplete="off">
+      <div class="field">
+        <label class="label" for="bridge-url">Bridge address</label>
+        <input id="bridge-url" type="url" inputmode="url" required placeholder="https://your-mac.tailnet.ts.net:4417" />
+      </div>
+      <div class="field">
+        <label class="label" for="code">Pairing code</label>
+        <input id="code" inputmode="numeric" pattern="[0-9 ]*" maxlength="7" placeholder="000 000" />
+      </div>
+      <details>
+        <summary>Advanced</summary>
+        <label class="label" for="bridge-token">Glasses token</label>
+        <input id="bridge-token" type="password" />
+      </details>
+      <p id="status" role="status"></p>
+      <button id="submit" type="submit">Pair</button>
+    </form>
+
+    <p class="caption">
+      Run <code>t3-glasses glasses-code</code> on the computer running the bridge to get a code. It's valid for 10 minutes.
+    </p>
+    <script type="module" src="/src/main.ts"></script>
+  </body>
+</html>

@@ -1,4 +1,4 @@
-import { randomBytes } from "node:crypto";
+import { createHash, randomInt, randomBytes } from "node:crypto";
 import { chmod, mkdir, readFile, rename, writeFile } from "node:fs/promises";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
@@ -47,8 +47,17 @@ export interface AccountConfig {
   hiddenEnvironments?: string[];
 }
 
+/** A short-lived code the glasses app exchanges for the glasses token. */
+export interface GlassesPairing {
+  /** SHA-256 of the code, hex. */
+  codeHash: string;
+  expiresAt: string;
+  attempts: number;
+}
+
 export interface BridgeConfig {
   version: 1;
+  glassesPairing?: GlassesPairing;
   account?: AccountConfig;
   /** Token the glasses app presents to the bridge. Secret. */
   glassesToken: string;
@@ -122,4 +131,35 @@ export function removeEnvironment(config: BridgeConfig, idOrLabel: string): Brid
       (env) => env.id !== idOrLabel && env.label.toLowerCase() !== needle,
     ),
   };
+}
+
+export const GLASSES_CODE_TTL_MS = 10 * 60_000;
+export const GLASSES_CODE_ATTEMPTS = 5;
+
+const hashCode = (code: string) => createHash("sha256").update(code.replace(/\D/g, "")).digest("hex");
+
+/** Issues a 6-digit code; returns it once and stores only its hash. */
+export function issueGlassesCode(config: BridgeConfig, now = Date.now()): string {
+  const code = String(randomInt(0, 1_000_000)).padStart(6, "0");
+  config.glassesPairing = {
+    codeHash: hashCode(code),
+    expiresAt: new Date(now + GLASSES_CODE_TTL_MS).toISOString(),
+    attempts: 0,
+  };
+  return code;
+}
+
+/** Checks a code; consumes it on success and counts failures against it. */
+export function redeemGlassesCode(config: BridgeConfig, code: string, now = Date.now()): "ok" | "invalid" | "expired" {
+  const pairing = config.glassesPairing;
+  if (!pairing || Date.parse(pairing.expiresAt) < now || pairing.attempts >= GLASSES_CODE_ATTEMPTS) {
+    config.glassesPairing = undefined;
+    return "expired";
+  }
+  if (hashCode(code) !== pairing.codeHash) {
+    pairing.attempts += 1;
+    return "invalid";
+  }
+  config.glassesPairing = undefined;
+  return "ok";
 }

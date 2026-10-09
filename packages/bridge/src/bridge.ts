@@ -1,7 +1,7 @@
 /** Wires config, account discovery, paired environments, and the HTTP server together. */
 import type { Server } from "node:http";
 import { ClerkAuth } from "./clerk.js";
-import { loadConfig, saveConfig, type BridgeConfig } from "./config.js";
+import { loadConfig, redeemGlassesCode, saveConfig, type BridgeConfig } from "./config.js";
 import { DpopSigner } from "./dpop.js";
 import { BearerAuth, EnvironmentConnection } from "./environment.js";
 import { Hub } from "./hub.js";
@@ -87,7 +87,15 @@ export async function startBridge(options: {
     log("No T3 account or paired environments yet. Run `t3-glasses setup`.");
   }
 
-  const server = createBridgeServer(hub, () => config);
+  const pairGlasses = async (code: string) => {
+    // The CLI issues codes in another process, so read the file fresh.
+    const onDisk = await loadConfig(options.configPath);
+    const outcome = redeemGlassesCode(onDisk, code);
+    await persist(onDisk);
+    if (outcome === "ok") return { token: onDisk.glassesToken };
+    return { error: outcome === "expired" ? "Code expired. Run `t3-glasses glasses-code` for a new one." : "Wrong code" };
+  };
+  const server = createBridgeServer(hub, () => config, pairGlasses);
   const host = options.host ?? config.host;
   const port = options.port ?? config.port;
   await new Promise<void>((resolve, reject) => {

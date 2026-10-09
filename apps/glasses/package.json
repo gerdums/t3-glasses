@@ -8,7 +8,7 @@
     "build": "tsc --noEmit -p tsconfig.json && vite build",
     "typecheck": "tsc --noEmit -p tsconfig.json",
     "test": "vitest run",
-    "pack": "npm run build && evenhub pack app.json dist -o t3-glasses.ehpk"
+    "pack": "node scripts/pack.mjs"
   },
   "dependencies": {
     "@evenrealities/even_hub_sdk": "^0.0.16",

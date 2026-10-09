@@ -6,6 +6,7 @@ import { accountFromConfig, startBridge } from "./bridge.js";
 import { ClerkAuth, DEFAULT_CLERK_FRONTEND_API } from "./clerk.js";
 import {
   defaultConfigPath,
+  issueGlassesCode,
   loadConfig,
   newGlassesToken,
   removeEnvironment,
@@ -31,6 +32,7 @@ Usage:
   t3-glasses service install        Run the bridge at login and keep it running (macOS)
   t3-glasses service uninstall|restart|status
   t3-glasses expose                 Publish the bridge on your tailnet over HTTPS
+  t3-glasses glasses-code           Show a 6-digit code to pair the glasses app
   t3-glasses token [--rotate]       Print (or replace) the glasses token
   t3-glasses pair <pairing link>    Add a machine that is not on T3 Connect
   t3-glasses unpair <id|label>      Remove a directly paired machine
@@ -107,14 +109,15 @@ async function showEnvironments(config: BridgeConfig): Promise<void> {
   }
 }
 
-function showGlassesInfo(config: BridgeConfig): void {
+async function showGlassesInfo(config: BridgeConfig): Promise<void> {
+  const code = issueGlassesCode(config);
+  await persist(config);
   console.log(`
-Glasses app settings
-  Bridge URL:    https://<this computer's tailnet name>:${config.port}
-                 (expose it with: tailscale serve --bg --https=${config.port} http://127.0.0.1:${config.port})
-  Glasses token: ${config.glassesToken}
+Glasses app
+  Bridge URL:    https://<this computer's tailnet name>:${config.port}  (t3-glasses expose prints it)
+  Pairing code:  ${code.slice(0, 3)} ${code.slice(3)}   (valid 10 minutes; enter it in the glasses app on your phone)
 
-Run the bridge with: t3-glasses serve`);
+Keep the bridge running with: t3-glasses service install`);
 }
 
 async function main(): Promise<void> {
@@ -150,7 +153,13 @@ async function main(): Promise<void> {
         console.log("Already signed in to T3.");
       }
       await showEnvironments(config);
-      showGlassesInfo(config);
+      await showGlassesInfo(config);
+      return;
+    }
+    case "glasses-code": {
+      const code = issueGlassesCode(config);
+      await persist(config);
+      console.log(`Pairing code: ${code.slice(0, 3)} ${code.slice(3)}  (valid 10 minutes)`);
       return;
     }
     case "serve": {
@@ -166,7 +175,6 @@ async function main(): Promise<void> {
     }
     case "status":
       await showEnvironments(config);
-      showGlassesInfo(config);
       if (process.platform === "darwin") console.log(`\nService: ${await serviceStatus()}`);
       return;
     case "service": {
