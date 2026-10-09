@@ -17,5 +17,6 @@
     "build": "npm run build -w @t3-glasses/protocol && npm run build -w @t3-glasses/glasses && npm run build -w @t3-glasses/bridge",
     "typecheck": "npm run typecheck --workspaces --if-present",
     "test": "npm run test --workspaces --if-present"
-  }
+  },
+  "license": "MIT"
 }

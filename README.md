@@ -150,3 +150,7 @@ npm test                  # bridge and glasses unit tests
 - [docs/glasses-ux.md](docs/glasses-ux.md): the display design
 - [apps/glasses/README.md](apps/glasses/README.md): simulator workflow;
   `apps/glasses/dev/shots.html` renders these screenshots from sample data
+
+## License
+
+[MIT](LICENSE)
