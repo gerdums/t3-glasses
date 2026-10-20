@@ -386,7 +386,11 @@ export class GlassesApp {
 
     if (type === OsEventTypeList.DOUBLE_CLICK_EVENT) {
       if (s.card?.kind === 'listening') await this.voice.cancel();
-      if (s.screen === 'Home' && !s.card) return;
+      // Double-tap on Home leaves the app; the system asks the user to confirm.
+      if (s.screen === 'Home' && !s.card) {
+        await this.bridge.shutDownPageContainer(1);
+        return;
+      }
       this.dispatch({ type: 'BACK' });
       await this.display();
       void this.refresh();

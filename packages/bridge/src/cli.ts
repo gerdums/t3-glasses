@@ -153,11 +153,13 @@ async function showPairing(config: BridgeConfig): Promise<void> {
   if (config.bridgeUrl) {
     const link = `${config.bridgeUrl}/#code=${code}`;
     console.log(`\n${bold("Pair your glasses")}  ${dim("(code valid for 10 minutes)")}\n`);
-    console.log("  1. In the Even app, turn on Developer Mode (Hardware tab, Developer Mode).");
-    console.log("  2. Open the Even Hub tab, tap Scan QR, and scan this code:\n");
+    console.log(`  ${bold("T3 Glasses from Even Hub:")} open it on your phone and enter`);
+    console.log(`     Bridge address  ${bold(config.bridgeUrl)}`);
+    console.log(`     Pairing code    ${bold(spaced)}\n`);
+    console.log(`  ${bold("Or, without installing it:")} turn on Developer Mode in the Even app`);
+    console.log("  (Hardware tab), open the Even Hub tab, tap Scan QR, and scan:\n");
     qrcode.generate(link, { small: true }, (art) => console.log(art.replace(/^/gm, "     ")));
     console.log(`  ${dim("Or open")} ${link}`);
-    console.log(`  ${dim("Or type the code")} ${bold(spaced)} ${dim("in T3 Glasses on your phone.")}`);
     console.log(`\n  ${dim("Your phone needs Tailscale turned on, signed in to the same account.")}`);
   } else {
     console.log(`\nPairing code: ${bold(spaced)} ${dim("(valid 10 minutes)")}`);

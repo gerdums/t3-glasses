@@ -72,7 +72,7 @@ Computers you link to T3 Connect later show up on the glasses automatically.
 |---|---|---|
 | Scroll | Move through the list | Page back through older messages |
 | Tap | Open | Show actions: approve, answer, reply, interrupt |
-| Double-tap | Back | Back (closes a card first) |
+| Double-tap | Back; on Home, exit the app | Back (closes a card first) |
 | Press and hold | | Record a voice reply; release to stop |
 
 Home lists your threads across all computers in the same order as T3 Code:
@@ -104,17 +104,19 @@ Update by running the install command again. More: `t3-glasses help`.
 <summary><b>Other ways to install the glasses app</b></summary>
 
 Scanning the QR code uses the Even app's developer mode, which loads the app
-from your bridge. To install it like a regular Even Hub app instead, build a
-private package for your bridge and upload it under **Private builds** in the
+from your bridge. To install it like a regular Even Hub app instead, build the
+package and upload it under **Private builds** in the
 [Even Hub developer portal](https://hub.evenrealities.com):
 
 ```sh
 cd ~/.t3-glasses
-BRIDGE_URL=https://mac-studio.your-tailnet.ts.net:4417 npm run pack -w @t3-glasses/glasses
+npm run pack -w @t3-glasses/glasses
 ```
 
 Install `apps/glasses/t3-glasses.ehpk` from the Even app, open it, and enter
-the 6-digit code from `t3-glasses glasses-code`.
+the bridge address and 6-digit code from `t3-glasses glasses-code`. Setting
+`BRIDGE_URL=<your bridge address>` when packing allows only that address and
+fills it in for you.
 
 </details>
 

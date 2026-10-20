@@ -44,7 +44,7 @@ firmware's native list selection box.
 |---|---|---|---|
 | Scroll | move selection | page history | move selection |
 | Tap | open | open actions | choose |
-| Double-tap | back | back to list | close card |
+| Double-tap | back; exit on Home | back to list | close card |
 | Hold / release | | record / transcribe | |
 
 The same actions are also registered as the native context menu.
