@@ -1,7 +1,7 @@
 {
   "name": "t3-glasses",
   "private": true,
-  "version": "0.2.1",
+  "version": "0.2.2",
   "description": "View and drive your T3 Code threads from Even Realities G2 smart glasses",
   "type": "module",
   "packageManager": "npm@11.6.2",

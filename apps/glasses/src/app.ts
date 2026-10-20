@@ -31,7 +31,7 @@ const PUSH_DEBOUNCE_MS = 250;
 const NOTICE_MS = 1600;
 
 // Protobuf omits zero values, so a click (CLICK_EVENT = 0) arrives with no eventType at all.
-const eventType = (event: EvenHubEvent) => {
+export const eventType = (event: EvenHubEvent) => {
   const source = event.listEvent ?? event.textEvent ?? (event.sysEvent && !event.sysEvent.imuData ? event.sysEvent : undefined);
   return source ? OsEventTypeList.fromJson(source.eventType ?? 0) : undefined;
 };
@@ -63,6 +63,10 @@ async function showPage(bridge: EvenAppBridge, next: Page): Promise<void> {
 }
 
 /** Shown on the glasses until the phone page has paired with a bridge. */
+export async function showConnectError(bridge: EvenAppBridge, message: string): Promise<void> {
+  await showPage(bridge, messagePage('T3 Code', `Can't reach your T3 Glasses bridge.\n\n${message}`, '\u00d7 Not connected'));
+}
+
 export async function showSetupScreen(bridge: EvenAppBridge): Promise<void> {
   await showPage(
     bridge,

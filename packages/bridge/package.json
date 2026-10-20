@@ -1,6 +1,6 @@
 {
   "name": "@t3-glasses/bridge",
-  "version": "0.2.1",
+  "version": "0.2.2",
   "private": true,
   "description": "Bridge between T3 Code environments and the t3-glasses Even Hub app",
   "type": "module",

@@ -1,6 +1,6 @@
-import { waitForEvenAppBridge } from '@evenrealities/even_hub_sdk';
+import { OsEventTypeList, waitForEvenAppBridge } from '@evenrealities/even_hub_sdk';
 import { HttpBridgeApi } from './api';
-import { GlassesApp, showSetupScreen } from './app';
+import { eventType, GlassesApp, showConnectError, showSetupScreen } from './app';
 import { loadSettings, pairWithCode, saveSettings, takeCodeFromUrl, type Settings } from './settings';
 
 const form = document.querySelector<HTMLFormElement>('#pair')!;
@@ -24,6 +24,11 @@ const bridge = await waitForEvenAppBridge();
 let settings = await loadSettings(bridge);
 let app: GlassesApp | undefined;
 
+// Until the thread list is up (not paired, or the bridge is unreachable), double-tap still exits.
+bridge.onEvenHubEvent((event) => {
+  if (!app && eventType(event) === OsEventTypeList.DOUBLE_CLICK_EVENT) void bridge.shutDownPageContainer(1);
+});
+
 function say(message: string, tone: 'ok' | 'error' | '' = '') {
   status.textContent = message;
   status.className = tone;
@@ -40,13 +45,18 @@ async function connect(config: Settings) {
   const next = new GlassesApp(bridge, new HttpBridgeApi(config.url, config.token));
   try {
     await new HttpBridgeApi(config.url, config.token).health();
-    await next.start();
+    // Set before start() so the fallback exit handler above stands down once the app takes input.
     app = next;
+    await next.start();
     say('');
     showPaired(config.url);
   } catch (error) {
+    if (app === next) await next.stop();
+    app = undefined;
+    const message = error instanceof Error ? error.message : String(error);
     showPaired(undefined);
-    say(error instanceof Error ? error.message : String(error), 'error');
+    say(message, 'error');
+    await showConnectError(bridge, message).catch(() => undefined);
   }
 }
 
